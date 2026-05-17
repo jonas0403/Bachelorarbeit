@@ -84,8 +84,15 @@ def plot_temp_alpha_beta(T_Plot, beta_R_Plot, alpha_S_Plot):
 
 
 #function for writing Bézier-points
+'''
 def create_default_profiles(self, json_path):  
     print("Generating default profiles...")
+    if not hasattr(self, 'meanline_data') or self.meanline_data is None:
+        messagebox.showwarning(
+            "Fehlende Daten", 
+            "Bitte berechne und speichere zuerst die '1D-Settings' (Meanline), bevor du die Standard-Profile erstellst!"
+        )
+        return
 
     
     # Debugging screen 
@@ -105,7 +112,7 @@ def create_default_profiles(self, json_path):
             traceback.print_exc()  # ← This shows you EXACTLY which line crashed
             messagebox.showerror("Error", "Please calculate the Meanline (1D Settings) first and make sure it's saved!")
             return 
-        '''
+            
     try:
         try:
             run_main_logic({'main_choice': 'default'}, self, json_path)
@@ -113,10 +120,11 @@ def create_default_profiles(self, json_path):
             print(f"Error executing run_main_logic: {e}")
             messagebox.showerror("Error", "Please calculate the Meanline (1D Settings) first and make sure it's saved!")
             return
-            '''
+
         global h_rel, l_R, l_S, beta_blade_R_in, beta_blade_R_out, alpha_S_in, alpha_S_out
         
-        h_H = [0.0, 0.2, 0.5, 0.8, 1.0]
+        num_stages = len(radial_data_R)
+        h_H_ref = [0.0, 0.2, 0.5, 0.8, 1.0]
 
         chord_length_R = np.interp(h_H, h_rel, l_R)
         chord_length_S = np.interp(h_H, h_rel, l_S)
@@ -127,9 +135,8 @@ def create_default_profiles(self, json_path):
         l_S_sorted = np.array(l_S)[sort_idx]
         
         def generate_dict(row):
+            
     
-
-            # ── exakt dieselbe Mathematik wie in bezier_control_points ──
             beta_S_BP_1, beta_S_BP_2, beta_S_BP_3, beta_S_BP_4 = [],[],[],[]
             alpha_S_BP_1, alpha_S_BP_2, alpha_S_BP_3, alpha_S_BP_4 = [],[],[],[]
             
@@ -237,6 +244,147 @@ def create_default_profiles(self, json_path):
         import traceback
         traceback.print_exc()
         messagebox.showerror("Error", f"An unexpected error occurred: {e}")
+'''
+
+def create_default_profiles(self, json_path): 
+    print("Generating default profiles...")
+ 
+    try:
+        try:
+            run_main_logic({'main_choice': 'default'}, self, json_path)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror(
+                "Error",
+                "Please calculate the Meanline (1D Settings) first and make sure it's saved!"
+            )
+            return
+ 
+        # h_H is the standard spanwise sample positions
+        h_H = [0.0, 0.2, 0.5, 0.8, 1.0]
+        c_03 = 0.277558
+        c_07 = 0.165432
+ 
+        # We will build a dict of all stage bezier data to write once
+        all_bezier_data = {}
+ 
+        for stage_num in range(1, self.stages_to_calc + 1):
+            # ---- pull per-stage radial-equilibrium results ----
+            rad_R = radial_data_R[stage_num]   # dict stored by run_main_logic
+            rad_S = radial_data_S[stage_num]
+ 
+            h_rel_s          = rad_R['h_rel']
+            l_R_s            = rad_R['l_R']
+            l_S_s            = rad_S['l_S']
+            beta_blade_R_in  = rad_R['beta_blade_R_in']
+            beta_blade_R_out = rad_R['beta_blade_R_out']
+            alpha_S_in       = rad_S['alpha_S_in']
+            alpha_S_out      = rad_S['alpha_S_out']
+ 
+            # Chord lengths interpolated to the five standard h_H positions
+            chord_length_R = np.interp(h_H, h_rel_s, l_R_s)
+            chord_length_S = np.interp(h_H, h_rel_s, l_S_s)
+ 
+            def generate_dict_for_stage(is_rotor):
+                """Build the bezier-point dict for one row of this stage."""
+                beta_S_BP_1, beta_S_BP_2, beta_S_BP_3, beta_S_BP_4 = [], [], [], []
+                alpha_S_BP_1, alpha_S_BP_2, alpha_S_BP_3, alpha_S_BP_4 = [], [], [], []
+ 
+                for i, h_val in enumerate(h_H):
+                    # find the matching index in h_rel_s (exact match, step=0.05)
+                    for j in range(len(h_rel_s)):
+                        if abs(h_rel_s[j] - h_val) < 1e-6:
+                            if is_rotor:
+                                b1 = beta_blade_R_in[j]
+                                b2 = beta_blade_R_out[j]
+                                delta = b2 - b1
+                                beta_S_BP_1.append(round(b1, 2))
+                                beta_S_BP_4.append(round(b2, 2))
+                                beta_S_BP_2.append(round(b2 - delta * c_03, 2))
+                                beta_S_BP_3.append(round(b2 - delta * c_07, 2))
+                            else:
+                                a1 = alpha_S_in[j]
+                                a2 = alpha_S_out[j]
+                                delta = a2 - a1
+                                alpha_S_BP_1.append(round(a1, 2))
+                                alpha_S_BP_4.append(round(a2, 2))
+                                alpha_S_BP_2.append(round(a2 - delta * c_03, 2))
+                                alpha_S_BP_3.append(round(a2 - delta * c_07, 2))
+                            break
+ 
+                if is_rotor:
+                    ref_chord = chord_length_R[2]   # 50% span chord
+                    rel_thickness = np.array([
+                        [0.023, 0.020, 0.015, 0.011, 0.007],
+                        [0.082, 0.071, 0.055, 0.038, 0.027],
+                        [0.017, 0.015, 0.011, 0.008, 0.005],
+                        [0.010, 0.009, 0.007, 0.005, 0.003],
+                    ])
+                    abs_thickness = rel_thickness * ref_chord
+                    angles = beta_S_BP_1 + beta_S_BP_2 + beta_S_BP_3 + beta_S_BP_4
+                    angle_key = "beta_S"
+                else:
+                    ref_chord = chord_length_S[2]
+                    rel_thickness = np.array([
+                        [0.015, 0.015, 0.015, 0.015, 0.015],
+                        [0.058, 0.058, 0.058, 0.058, 0.058],
+                        [0.011, 0.011, 0.011, 0.011, 0.011],
+                        [0.006, 0.006, 0.006, 0.006, 0.006],
+                    ])
+                    abs_thickness = rel_thickness * ref_chord
+                    angles = alpha_S_BP_1 + alpha_S_BP_2 + alpha_S_BP_3 + alpha_S_BP_4
+                    angle_key = "alpha_S"
+ 
+                thickness_combined = [
+                    round(float(v), 3)
+                    for row_vals in abs_thickness
+                    for v in row_vals
+                ]
+ 
+                return {
+                    "h/H":   list(h_H),
+                    angle_key: angles,
+                    "d/l":   thickness_combined,
+                    "m*":    [0.0]*5 + [0.3]*5 + [0.7]*5 + [1.0]*5,
+                }
+ 
+            rotor_dict  = generate_dict_for_stage(is_rotor=True)
+            stator_dict = generate_dict_for_stage(is_rotor=False)
+ 
+            # Keys: rotor_stage_1, stator_stage_1, rotor_stage_2, …
+            all_bezier_data[f"rotor_stage_{stage_num}"]  = rotor_dict
+            all_bezier_data[f"stator_stage_{stage_num}"] = stator_dict
+ 
+            print(f"  Stage {stage_num}: rotor/stator bezier points generated.")
+ 
+        # ---- write everything to JSON in one pass ----
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+ 
+        data["Bezier_point_data"] = all_bezier_data
+ 
+        with open(json_path, 'w') as f:
+            json.dump(data, f, indent=4)
+ 
+        # Update in-memory cache on the GUI object
+        if hasattr(self, "prepop_bezier_point_rotor"):
+            self.prepop_bezier_point_rotor = all_bezier_data.get("rotor_stage_1", {})
+            self.prepop_bezier_point_stator = all_bezier_data.get("stator_stage_1", {})
+ 
+        print(f"Default profiles for {self.stages_to_calc} stage(s) saved to JSON.")
+        messagebox.showinfo(
+            "Success",
+            f"Default profiles for {self.stages_to_calc} stage(s) successfully created and saved to JSON!"
+        )
+ 
+    except NameError as e:
+        print(f"Variable Error: {e}")
+        messagebox.showerror("Error", "Please calculate the Meanline (1D Settings) first! (Debug: #2)")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        messagebox.showerror("Error", f"An unexpected error occurred: {e}")
 
 def save_profile(source_filename):
         if not os.path.exists(source_filename):
@@ -269,22 +417,89 @@ radial_data_R = {}
 radial_data_S = {}
 
 def init_channel_data(compressor_gui_data):
-    '''
-    Defining variables from the channel function for further use
-    
-    '''
+    """
+    Compute channel geometry for every stage and store it in the global
+    channel_data dict.  Each stage after the first is shifted by a
+    cumulative axial offset so that all coordinates live in one global
+    reference frame instead of each stage starting at x = 0.
+    """
     global channel_data
+    channel_data = {}
+    cumulative_x_offset = 0.0          # global axial position of stage-1 inlet
+
     for s in range(1, compressor_gui_data.stages_to_calc + 1):
         compressor_gui_data.stage = s
         x_values_s, r_values_s, m_prime_values_s, x0_s = channel(compressor_gui_data)
+
+        # channel() always returns a numpy array for x0; convert once
+        x0_s = list(x0_s)
+
+        if cumulative_x_offset != 0.0:
+            # ── shift every x-coordinate into the global frame ──────────────
+            # x0: the 9 spline control points
+            x0_s = [x + cumulative_x_offset for x in x0_s]
+
+            # x_values and m_prime_values: one list per span height (h_H)
+            for k in range(len(x_values_s)):
+                x_values_s[k]      = [v + cumulative_x_offset for v in x_values_s[k]]
+                m_prime_values_s[k] = [v + cumulative_x_offset for v in m_prime_values_s[k]]
+            # r_values are radii – they are NOT shifted
+
         channel_data[s] = {
-            'x_values': x_values_s,
-            'r_values': r_values_s,
+            'x_values':       x_values_s,
+            'r_values':       r_values_s,
             'm_prime_values': m_prime_values_s,
-            'x0': x0_s
+            'x0':             x0_s,
         }
+
+        # Stage s+1's local x0[1]=0 (rotor inlet) must land at the current
+        # stage's stator outlet x0[7] in the global frame.
+        cumulative_x_offset = x0_s[7]
+
+        print(f"Stage {s}: channel stored. "
+              f"x0[1]={x0_s[1]:.1f} mm  x0[7]={x0_s[7]:.1f} mm  "
+              f"→ next offset = {cumulative_x_offset:.1f} mm")
+
+# def init_channel_data(compressor_gui_data):
+#     '''
+#     Defining variables from the channel function for further use
     
-    #x_values, r_values, m_prime_values, x0 = channel(compressor_gui_data)
+#     '''
+#     global channel_data
+#     channel_data = {}
+#     cumulative_x_offset = 0.0
+    
+#     for s in range(1, compressor_gui_data.stages_to_calc + 1):
+#         compressor_gui_data.stage = s
+#         x_values_s, r_values_s, m_prime_values_s, x0_s = channel(compressor_gui_data)
+
+#         x0_s = list(x0_s)
+
+#         if cumulative_x_offset != 0.0:
+#             # ── shift every x-coordinate into the global frame ──────────────
+#             # x0: the 9 spline control points
+#             x0_s = [x + cumulative_x_offset for x in x0_s]
+
+#             # x_values and m_prime_values: one list per span height (h_H)
+#             for k in range(len(x_values_s)):
+#                 x_values_s[k]      = [v + cumulative_x_offset for v in x_values_s[k]]
+#                 m_prime_values_s[k] = [v + cumulative_x_offset for v in m_prime_values_s[k]]
+#             # r_values are radii – they are NOT shifted
+
+#         channel_data[s] = {
+#             'x_values':       x_values_s,
+#             'r_values':       r_values_s,
+#             'm_prime_values': m_prime_values_s,
+#             'x0':             x0_s,
+#         }
+        
+#         cumulative_x_offset = x0_s[7]
+
+#         print(f"Stage {s}: channel stored. "
+#               f"x0[1]={x0_s[1]:.1f} mm  x0[7]={x0_s[7]:.1f} mm  "
+#               f"→ next offset = {cumulative_x_offset:.1f} mm")
+    
+#     #x_values, r_values, m_prime_values, x0 = channel(compressor_gui_data)
 
 def run_main_logic(new_adjustment_data, compressor_gui_data, json_path):# approach = 1 constant_r_parameter = 1 need to be defined here
     # Calls the channel function to initialise the channel coordinates for all stages that are beeing calculated
@@ -919,7 +1134,8 @@ def blade_metal_BP(ROW):
 '''
 
 # Bézier control points from csv file new# Bézier control points directly from JSON (ersetzt die alte .txt Version)
-def blade_metal_BP(row):
+#OLD-VERSION
+'''def blade_metal_BP(row):
     global ACTIVE_JSON_PATH
     json_path = ACTIVE_JSON_PATH
     try:
@@ -958,7 +1174,7 @@ def blade_metal_BP(row):
         m_star[15:20]
     ]
     
-    return beta_M_a, beta_M_2, beta_M_3, beta_M_e, d_l_a, d_l_2, d_l_3, d_l_e, m_star_BP
+    return beta_M_a, beta_M_2, beta_M_3, beta_M_e, d_l_a, d_l_2, d_l_3, d_l_e, m_star_BP'''
 ''' 
 ### OLD ###
 def blade_metal_BP(ROW):
@@ -1015,6 +1231,73 @@ def blade_metal_BP(ROW):
     
     return beta_M_a, beta_M_3, beta_M_2, beta_M_e, d_l_a, d_l_3, d_l_2, d_l_e, m_star_BP 
 '''
+def blade_metal_BP(row):
+    """
+    Read Bezier control points for blade row `row` from JSON.
+ 
+    Row numbering (1-based, interleaved):
+        1 = rotor  stage 1
+        2 = stator stage 1
+        3 = rotor  stage 2
+        4 = stator stage 2
+        …
+    """
+    global ACTIVE_JSON_PATH
+    json_path = ACTIVE_JSON_PATH
+ 
+    try:
+        with open(json_path, 'r') as file:
+            data = json.load(file)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error while reading JSON file: {e}")
+        return [], [], [], [], [], [], [], [], [[], [], [], []]
+ 
+    # Derive stage number and blade type from the row index
+    stage_num = (row - 1) // 2 + 1
+    is_rotor  = (row % 2 != 0)
+ 
+    blade_key = f"rotor_stage_{stage_num}"  if is_rotor else f"stator_stage_{stage_num}"
+    angle_key = "beta_S"                    if is_rotor else "alpha_S"
+ 
+    bezier_store = data.get("Bezier_point_data", {})
+ 
+    b_data = bezier_store.get(blade_key)
+    if b_data is None:
+        fallback_key = "rotor" if is_rotor else "stator"
+        b_data = bezier_store.get(fallback_key)
+        if b_data is not None:
+            print(
+                f"Warning: per-stage key '{blade_key}' not found – "
+                f"falling back to legacy key '{fallback_key}'. "
+                f"Re-generate profiles to fix this."
+            )
+ 
+    if not b_data:
+        print(f"No bezier data found for '{blade_key}'!")
+        return [], [], [], [], [], [], [], [], [[], [], [], []]
+ 
+    angles  = b_data.get(angle_key, [0] * 20)
+    d_l     = b_data.get("d/l",     [0] * 20)
+    m_star  = b_data.get("m*",      [0] * 20)
+ 
+    beta_M_e = angles[0:5]
+    beta_M_2 = angles[5:10]
+    beta_M_3 = angles[10:15]
+    beta_M_a = angles[15:20]
+ 
+    d_l_e = d_l[0:5]
+    d_l_2 = d_l[5:10]
+    d_l_3 = d_l[10:15]
+    d_l_a = d_l[15:20]
+ 
+    m_star_BP = [
+        m_star[0:5],
+        m_star[5:10],
+        m_star[10:15],
+        m_star[15:20],
+    ]
+ 
+    return beta_M_a, beta_M_2, beta_M_3, beta_M_e, d_l_a, d_l_2, d_l_3, d_l_e, m_star_BP
 #Section to fix center of gravity for all sections
 #Calculation for h/H = 0.5 cut
 def calculation_of_section_0_5(row):

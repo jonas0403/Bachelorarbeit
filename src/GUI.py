@@ -65,13 +65,24 @@ class CompressorGui:
             self.prepop_thermo_data = data['Thermodynamic_input_data']
             self.prepop_meanline_input_data = data['Meanline_input_data']
             self.prepop_diameter_data = data['Diameter_data']
-            self.prepop_bezier_point_stator = data['Bezier_point_data']['stator']
-            self.prepop_bezier_point_rotor = data['Bezier_point_data']['rotor']
+            # self.prepop_bezier_point_stator = data['Bezier_point_data']['stator']
+            # self.prepop_bezier_point_rotor = data['Bezier_point_data']['rotor']
             self.prepop_metadata = data['Metadata'] 
             self.prepop_grid_data = data['Grid_data'] 
             self.prepop_bleed_air_data = data['Bleed_air_data']
             self.prepop_intake_outtake_area_data = data['Intake_Outtake_area']
-  
+            
+        bezier_store = data.get('Bezier_point_data', {})
+
+        # Support both new per-stage keys (rotor_stage_1 …) and the old single keys
+        if 'rotor_stage_1' in bezier_store:
+            self.prepop_bezier_point_rotor  = bezier_store['rotor_stage_1']
+            self.prepop_bezier_point_stator = bezier_store.get('stator_stage_1', {})
+        else:
+            # Legacy fallback – JSON was written before the multi-stage patch
+            self.prepop_bezier_point_rotor  = bezier_store.get('rotor',  {})
+            self.prepop_bezier_point_stator = bezier_store.get('stator', {})
+        
     '''
     Function and population of first tab
     Entryboxes for the first 0 Dimensional Thermodynamic calculation
@@ -2136,9 +2147,149 @@ class CompressorGui:
     #         print("stage_data saved sucessfully")
         
     #     self.save_settings() # Speichert die Einstellungen in der Settings.txt
-        
+    
+    def _bezier_data_ready(self) -> bool:
+        """Return True when at least stage-1 bezier data exists in the JSON."""
+        try:
+            with open(json_path, 'r') as f:
+                data = json.load(f)
+            store = data.get("Bezier_point_data", {})
+            has_new    = "rotor_stage_1" in store and "stator_stage_1" in store
+            has_legacy = "rotor" in store and "stator" in store
+            return has_new or has_legacy
+        except Exception:
+            return False  
 
-        
+    def show_plots_section_rotor(self):
+        if not self._bezier_data_ready():
+            messagebox.showwarning("Missing data",
+                "No Bezier profile data found.\n"
+                "Please click 'Create Default Profile(s)' first.")
+            return
+        farben = ["pink", "blue", "green", "red", "black"]
+        for stage in range(1, self.stages_to_calc + 1):
+            row = 2 * stage - 1          # rotor row for this stage
+            for k, h_val in enumerate([0.0, 0.2, 0.5, 0.8, 1.0]):
+                _, _, _, m_star_u, R_theta_s_star_u, m_star_l, R_theta_s_star_l, *_ = \
+                    calculation_of_section(h_val, row)
+                label = f"Stage {stage} – {int(h_val*100)}%" if k == 2 else None
+                plt.plot(m_star_u, R_theta_s_star_u, color=farben[k], label=label)
+                plt.plot(m_star_l, R_theta_s_star_l, color=farben[k])
+        plt.xlabel("x [mm]")
+        plt.ylabel("Rθ [mm]")
+        plt.title("Rotor Geometry – all stages")
+        plt.legend()
+        plt.axis('equal')
+        plt.show()
+
+    def show_plots_section_stator(self):
+        if not self._bezier_data_ready():
+            messagebox.showwarning("Missing data",
+                "No Bezier profile data found.\n"
+                "Please click 'Create Default Profile(s)' first.")
+            return
+        farben = ["pink", "blue", "green", "red", "black"]
+        for stage in range(1, self.stages_to_calc + 1):
+            row = 2 * stage              # stator row for this stage
+            for k, h_val in enumerate([0.0, 0.2, 0.5, 0.8, 1.0]):
+                _, _, _, m_star_u, R_theta_s_star_u, m_star_l, R_theta_s_star_l, *_ = \
+                    calculation_of_section(h_val, row)
+                label = f"Stage {stage} – {int(h_val*100)}%" if k == 2 else None
+                plt.plot(m_star_u, R_theta_s_star_u, color=farben[k], label=label)
+                plt.plot(m_star_l, R_theta_s_star_l, color=farben[k])
+        plt.xlabel("x [mm]")
+        plt.ylabel("Rθ [mm]")
+        plt.title("Stator Geometry – all stages")
+        plt.legend()
+        plt.axis('equal')
+        plt.show()
+
+    # ── angle-distribution plots ──────────────────────────────────────────────────
+    def show_plots_angle_rotor(self):
+        if not self._bezier_data_ready():
+            messagebox.showwarning("Missing data",
+                "No Bezier profile data found.\n"
+                "Please click 'Create Default Profile(s)' first.")
+            return
+        farben = ["pink", "blue", "green", "red", "black"]
+        for stage in range(1, self.stages_to_calc + 1):
+            row = 2 * stage - 1
+            for k, h_val in enumerate([0.0, 0.2, 0.5, 0.8, 1.0]):
+                _, _, _, _, _, _, _, m_prime, _, _, m_BP, beta_S, beta_BP, *_ = \
+                    calculation_of_section(h_val, row)
+                label = f"Stage {stage} – {int(h_val*100)}%" if k == 2 else None
+                plt.plot(m_prime, beta_S, color=farben[k], label=label)
+                plt.scatter(m_BP, beta_BP, color=farben[k])
+        plt.xlabel("x/s [%]")
+        plt.ylabel("Blade angle [°]")
+        plt.title("Blade Angle Distribution – Rotor, all stages")
+        plt.legend()
+        plt.show()
+
+    def show_plots_angle_stator(self):
+        if not self._bezier_data_ready():
+            messagebox.showwarning("Missing data",
+                "No Bezier profile data found.\n"
+                "Please click 'Create Default Profile(s)' first.")
+            return
+        farben = ["pink", "blue", "green", "red", "black"]
+        for stage in range(1, self.stages_to_calc + 1):
+            row = 2 * stage
+            for k, h_val in enumerate([0.0, 0.2, 0.5, 0.8, 1.0]):
+                _, _, _, _, _, _, _, m_prime, _, _, m_BP, beta_S, beta_BP, *_ = \
+                    calculation_of_section(h_val, row)
+                label = f"Stage {stage} – {int(h_val*100)}%" if k == 2 else None
+                plt.plot(m_prime, beta_S, color=farben[k], label=label)
+                plt.scatter(m_BP, beta_BP, color=farben[k])
+        plt.xlabel("x/s [%]")
+        plt.ylabel("Blade angle [°]")
+        plt.title("Blade Angle Distribution – Stator, all stages")
+        plt.legend()
+        plt.show()
+
+    # ── thickness-distribution plots ──────────────────────────────────────────────
+    def show_plots_thickness_rotor(self):
+        if not self._bezier_data_ready():
+            messagebox.showwarning("Missing data",
+                "No Bezier profile data found.\n"
+                "Please click 'Create Default Profile(s)' first.")
+            return
+        farben = ["pink", "blue", "green", "red", "black"]
+        for stage in range(1, self.stages_to_calc + 1):
+            row = 2 * stage - 1
+            for k, h_val in enumerate([0.0, 0.2, 0.5, 0.8, 1.0]):
+                _, _, _, _, _, _, _, m_prime, _, _, m_BP, _, _, d_l, d_l_BP, *_ = \
+                    calculation_of_section(h_val, row)
+                label = f"Stage {stage} – {int(h_val*100)}%" if k == 2 else None
+                plt.plot(m_prime, d_l, color=farben[k], label=label)
+                plt.scatter(m_BP, d_l_BP, color=farben[k])
+        plt.xlabel("x/s [%]")
+        plt.ylabel("Thickness d [mm]")
+        plt.title("Thickness Distribution – Rotor, all stages")
+        plt.legend()
+        plt.show()
+
+    def show_plots_thickness_stator(self):
+        if not self._bezier_data_ready():
+            messagebox.showwarning("Missing data",
+                "No Bezier profile data found.\n"
+                "Please click 'Create Default Profile(s)' first.")
+            return
+        farben = ["pink", "blue", "green", "red", "black"]
+        for stage in range(1, self.stages_to_calc + 1):
+            row = 2 * stage
+            for k, h_val in enumerate([0.0, 0.2, 0.5, 0.8, 1.0]):
+                _, _, _, _, _, _, _, m_prime, _, _, m_BP, _, _, d_l, d_l_BP, *_ = \
+                    calculation_of_section(h_val, row)
+                label = f"Stage {stage} – {int(h_val*100)}%" if k == 2 else None
+                plt.plot(m_prime, d_l, color=farben[k], label=label)
+                plt.scatter(m_BP, d_l_BP, color=farben[k])
+        plt.xlabel("x/s [%]")
+        plt.ylabel("Thickness d [mm]")
+        plt.title("Thickness Distribution – Stator, all stages")
+        plt.legend()
+        plt.show()        
+    '''    
     def show_plots_section_rotor(self):
         NROW = 1
         
@@ -2280,7 +2431,7 @@ class CompressorGui:
         plt.xlabel('x/s [%]')
         plt.ylabel("thickness d [mm]")           
         plt.show()
-
+    '''
     # endregion
     
     def grid_definition_tab(self, parent_frame):

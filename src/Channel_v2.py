@@ -436,10 +436,10 @@ def channel(compressor_gui_data):
     Stator = [0.3, 0.15, 0.4]
     
     t0 = np.arange(-1.0, 8.0, 1.0)
-    print(f"alkskashdk {inlet_dist}")
-
+    #print(f"alkskashdk {inlet_dist}")
+    start_x = getattr(compressor_gui_data, 'current_x_offset', 0.0)
     x0 = np.full_like(t0, 0)
-    x0[1] = 0
+    x0[1] = start_x
     x0[2] = round(Rotor[0]*l_R, 1)
     if stage == 1:
         x0[0] = -inlet_dist * l_R
@@ -474,16 +474,25 @@ def channel(compressor_gui_data):
     r0_N[7] = round(D_H3/2, 1)
     r0_N[8] = round((r0_N[7] - r0_N[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_N[7], 1)
 
-    r0_G = np.full_like(x0, 0)
+    r0_G = np.full_like(x0, 0, dtype=float)
     r0_G[1] = round(D_S1/2, 1)
     r0_G[2] = r0_G[1] + round((D_S2-D_S1)/2*(x0[2]-x0[1])/(x0[4]-x0[1]), 1)
-    r0_G[0] = round((r0_G[2]-r0_G[1])/(x0[2]-x0[1])*x0[0]+r0_G[1], 1)
-    r0_G[3] = r0_G[1]+ round((D_S2-D_S1)/2*(x0[3]-x0[1])/(x0[4]-x0[1]), 1)
+    r0_G[0] = round((r0_G[2]-r0_G[1])/(x0[2]-x0[1])*(x0[0]-x0[1])+r0_G[1], 1)
+    r0_G[3] = r0_G[1] + round((D_S2-D_S1)/2*(x0[3]-x0[1])/(x0[4]-x0[1]), 1)
     r0_G[5] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[5]-x0[4])/(x0[7]-x0[4]), 1)
     r0_G[4] = round((D_S2/2 + (r0_G[3]+(r0_G[5]-r0_G[3])*(x0[4]-x0[3])/(x0[5]-x0[3])))/2 ,1)
     r0_G[6] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[6]-x0[4])/(x0[7]-x0[4]), 1)
     r0_G[7] = round(D_S3/2, 1)
-    r0_G[8] = round((r0_G[7] - r0_G[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_G[7], 1)   
+    r0_G[8] = round((r0_G[7] - r0_G[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_G[7], 1)
+    # r0_G[1] = round(D_S1/2, 1)
+    # r0_G[2] = r0_G[1] + round((D_S2-D_S1)/2*(x0[2]-x0[1])/(x0[4]-x0[1]), 1)
+    # r0_G[0] = round((r0_G[2]-r0_G[1])/(x0[2]-x0[1])*x0[0]+r0_G[1], 1)
+    # r0_G[3] = r0_G[1]+ round((D_S2-D_S1)/2*(x0[3]-x0[1])/(x0[4]-x0[1]), 1)
+    # r0_G[5] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[5]-x0[4])/(x0[7]-x0[4]), 1)
+    # r0_G[4] = round((D_S2/2 + (r0_G[3]+(r0_G[5]-r0_G[3])*(x0[4]-x0[3])/(x0[5]-x0[3])))/2 ,1)
+    # r0_G[6] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[6]-x0[4])/(x0[7]-x0[4]), 1)
+    # r0_G[7] = round(D_S3/2, 1)
+    # r0_G[8] = round((r0_G[7] - r0_G[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_G[7], 1)   
     
     
     if stage == 1:
@@ -602,28 +611,53 @@ def channel(compressor_gui_data):
             
         plt.show()
     
-
     m_prime_N = []
     m_prime_N.append(0.0)
     for i in range(len(t)-1):
-        if t[i] < 0.0: 
+        if t[i] < -1e-6:  # Sicherer Float-Vergleich
             m_neu = m_prime_N[0] - math.sqrt((x_N[i+1]-x_N[i])**2 + (r_N[i+1]-r_N[i])**2)
             m_prime_N.insert(0,m_neu)
-        elif t[i] > 0.0:
+        elif t[i] >= -1e-6:
             m_neu = m_prime_N[i] + math.sqrt((x_N[i+1]-x_N[i])**2 + (r_N[i+1]-r_N[i])**2)
             m_prime_N.append(m_neu)
 
     m_prime_G = []
     m_prime_G.append(0.0)
     for i in range(len(t)-1):
-        if t[i] < 0.0: 
+        if t[i] < -1e-6: 
             m_neu = m_prime_G[0]-math.sqrt((x_G[i+1]-x_G[i])**2+(r_G[i+1]-r_G[i])**2)
             m_prime_G.insert(0,m_neu)
-        elif t[i] > 0.0:
+        elif t[i] >= -1e-6:
             m_neu = m_prime_G[i] + math.sqrt((x_G[i+1]-x_G[i])**2+(r_G[i+1]-r_G[i])**2)
             m_prime_G.append(m_neu)
+            
+    # Den globalen Offset auf unsere Meridionalstrecke anwenden
+    m_prime_N = [m + start_x for m in m_prime_N]
+    m_prime_G = [m + start_x for m in m_prime_G]
     
     x_values, r_values, m_prime_values = [], [], []
+    
+    # m_prime_N = []
+    # m_prime_N.append(0.0)
+    # for i in range(len(t)-1):
+    #     if t[i] < 0.0: 
+    #         m_neu = m_prime_N[0] - math.sqrt((x_N[i+1]-x_N[i])**2 + (r_N[i+1]-r_N[i])**2)
+    #         m_prime_N.insert(0,m_neu)
+    #     elif t[i] > 0.0:
+    #         m_neu = m_prime_N[i] + math.sqrt((x_N[i+1]-x_N[i])**2 + (r_N[i+1]-r_N[i])**2)
+    #         m_prime_N.append(m_neu)
+
+    # m_prime_G = []
+    # m_prime_G.append(0.0)
+    # for i in range(len(t)-1):
+    #     if t[i] < 0.0: 
+    #         m_neu = m_prime_G[0]-math.sqrt((x_G[i+1]-x_G[i])**2+(r_G[i+1]-r_G[i])**2)
+    #         m_prime_G.insert(0,m_neu)
+    #     elif t[i] > 0.0:
+    #         m_neu = m_prime_G[i] + math.sqrt((x_G[i+1]-x_G[i])**2+(r_G[i+1]-r_G[i])**2)
+    #         m_prime_G.append(m_neu)
+    
+    # x_values, r_values, m_prime_values = [], [], []
     for _ in range(len(h_H)):
         x_values.append([])
         r_values.append([])

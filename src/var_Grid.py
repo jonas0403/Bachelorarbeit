@@ -8,6 +8,8 @@ import os
 import Stage_v3_working_with_bleedair as Stage
 import json
 
+#from old.Stage_v3_working_with_bleedair import NROW
+
         
 
 # Schreibt Werte in Blöcken von 8 pro Zeile in die Datei
@@ -303,11 +305,9 @@ def write_head_file(KM_grid_density, IM_grid_density, file_path, section, NROW, 
         file.write("      ISHIFT    NEXTRAP_LE  NEXTRAP_TE \n")
         file.write("         2        10        10\n")
         file.write("  (NSTG(N),N=1,NROWS) \n")
-        '''
-        nstg_values = " ".join(["   1"] * NROW) # Needs to change to this:
-        '''
-        #prints only stage values instead of 2*stage: nstg_values = " ".join([str((i // 2) + 1) for i in range(CompressorGui.stages_to_calc)])        
-        nstg_values = " ".join([str((i // 2) + 1) for i in range(CompressorGui.stages_to_calc * 2)])
+        
+        nstg_values = " ".join([str((i // NROW) + 1) for i in range(CompressorGui.stages_to_calc * NROW)])
+        
         file.write(nstg_values + "\n")
         file.write("  5  TIME STEPS FOR PRINTOUT \n")
         file.write("      9000      9000      9000      9000      9000\n")
@@ -790,26 +790,7 @@ def process_grid_data(json_path, CompressorGui):
 
     enable_bleed_air = bleed_air_data['enable_bleed_air']
     
-    all_rows_grid_data = generate_var_grid_data(nrow_wert, IM_grid_density, KM_grid_density, JM_grid_density, inlet_percentage, outlet_percentage, ref_chord_length, levels, CompressorGui)
-    
-    
-    ''' 
-    ### Debugging Screen to see the current stage indicies and if the correct calling order is followed
-    # Temportary needs to be deleted
-    '''
-    print("\n--- X RANGE MONOTONICITY CHECK ---")
-    prev_max_x = -float('inf')
-    all_ok = True
-    for data in all_rows_grid_data:
-        min_x = min(data['x_new'][0])
-        max_x = max(data['x_new'][0])
-        status = "OK" if min_x > prev_max_x else "*** OVERLAP ***"
-        print(f"  Row {data['row_num']}: x=[{min_x:.4f}, {max_x:.4f}]  {status}")
-        if status != "OK":
-            all_ok = False
-        prev_max_x = max_x
-    print(f"  Result: {'PASSED' if all_ok else 'FAILED'}\n")
-    
+    all_rows_grid_data = generate_var_grid_data(nrow_wert, IM_grid_density, KM_grid_density, JM_grid_density, inlet_percentage, outlet_percentage, ref_chord_length, levels, CompressorGui)    
     
     
     # old hardcoded first value
@@ -842,6 +823,11 @@ def process_grid_data(json_path, CompressorGui):
         d_coords = data['d_new']
         r_coords = data['R_new']
         rtheta_coords = data['Rtheta_new']
+        
+        max_r = max(max(sec) for sec in r_coords)
+        if max_r < 0.05:
+            r_coords = [[val * 1000.0 for val in sec] for sec in r_coords]
+        
         JLE = data['JLE']
         JTE = data['JTE']
         JM_row = data['JM']
@@ -918,9 +904,12 @@ def process_grid_data(json_path, CompressorGui):
         print("Q3D information written successfully.")
     
     print("Starting writing end of file...")
-    write_end_file(nrow_wert, full_output_path, 0, KM_grid_density, levels, CompressorGui, Stage.radial_data_R, Stage.radial_data_S)
-    print(f"Grid data for all rows written to {full_output_path} successfully.")
     
+    total_blade_rows = nrow_wert * CompressorGui.stages_to_calc
+    
+    write_end_file(total_blade_rows, full_output_path, 0, KM_grid_density, levels, CompressorGui, Stage.radial_data_R, Stage.radial_data_S)
+    
+    print(f"Grid data for all rows written to {full_output_path} successfully.")
     print("All tasks completed successfully.")
 
     
