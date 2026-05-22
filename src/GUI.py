@@ -22,6 +22,7 @@ from Cubspline_function_v2 import cubspline
 from Thermodynamic_calc_GUI import Thermo
 from Fixed_radii_Meanline_GUI_v4 import meanline
 import var_Grid as VG
+import debug_log
 
 
 current_dir = Path(__file__).parent.parent
@@ -2788,6 +2789,7 @@ class CompressorGui:
             # ============================================================
             '''
             print("Grid is saved.")
+            debug_log.open_file(os.path.join(os.path.dirname(json_path), "..", "outputFiles", "debug.txt"))
             # Warum gibts das zwei mal für den selben knopf?
             try:
                 run_main_logic({'main_choice': 'default'}, self, json_path)

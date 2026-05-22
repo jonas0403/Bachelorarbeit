@@ -7,6 +7,7 @@ import numpy as np
 import os
 import Stage_v3_working_with_bleedair as Stage
 import json
+import debug_log
 
 #from old.Stage_v3_working_with_bleedair import NROW
 
@@ -114,30 +115,28 @@ def multall_grid_data_head_row(file_path, NSEC, row, JLE, JM, JTE, KM, tip_clear
     section = 0
     
     current_stage = current_stage_num - 1
-    print(f"Debug current_stage (idx) = {current_stage}")
-    print(f"Debug current_stage_num = {current_stage_num}")
+    debug_log.debug(f"Debug current_stage (idx) = {current_stage}")
+    debug_log.debug(f"Debug current_stage_num = {current_stage_num}")
     
     global_row_num = row_num - 1
-    print(f"Debug global_row_num (idx) = {global_row_num}")
-    print(f"Debug global_row = {row_num}")
+    debug_log.debug(f"Debug global_row_num (idx) = {global_row_num}")
+    debug_log.debug(f"Debug global_row = {row_num}")
     
     
     ktipstart = 0
     ktipend = 0
-    actual_tip_clearance = 0
-    print(f"DEBUG: current_stage value is {current_stage} and type is {type(current_stage)}")
+    actual_tip_clearance = 0.0
+    debug_log.debug(f"DEBUG: current_stage value is {current_stage} and type is {type(current_stage)}")
     if tip_clearance[current_stage] > 0:
         if row_num %2 != 0:
             ktipstart = KM - 4
             ktipend = KM
-            actual_tip_clearance = tip_clearance
+            actual_tip_clearance = tip_clearance[current_stage]
         else:
             ktipstart = 0
             ktipend = 0
-            actual_tip_clearance = 0.0
     
     if tip_clearance[current_stage] == 0:
-        actual_tip_clearance = 0
         ktipstart = 0
         ktipend = 0
 
@@ -188,7 +187,7 @@ def multall_grid_data_head_row(file_path, NSEC, row, JLE, JM, JTE, KM, tip_clear
         if ktipstart > 0:
             
             file.write("  FRACTIP1,     FRACTIP2 \n")
-            file.write(f"  {actual_tip_clearance[current_stage]:.8f}       {actual_tip_clearance[current_stage]:.8f}\n")
+            file.write(f"  {actual_tip_clearance:.8f}       {actual_tip_clearance:.8f}\n")
         
             file.write("  FTHICK(K) \n")
             ftchick_values = [1.0] * KM
@@ -478,7 +477,7 @@ def write_end_file(total_rows, file, section, KM, levels, CompressorGui, radial_
     # Identify the last stage to set the exit backpressure (PDOWN)
     last_stg_idx = CompressorGui.stages_to_calc
     
-    print(f"DEBUG: Starting write_end_file for {total_rows} rows. Last stage index: {last_stg_idx}")
+    debug_log.debug(f"DEBUG: Starting write_end_file for {total_rows} rows. Last stage index: {last_stg_idx}")
 
     try:
         # 1. Get Inlet Boundary Conditions (from global Stage module)
@@ -487,17 +486,17 @@ def write_end_file(total_rows, file, section, KM, levels, CompressorGui, radial_
         p_inlet = round(Stage.p_t1[0], 1)
         um_inlet = round(Stage.cm1[0], 4)
         
-        print(f"DEBUG: Inlet data loaded -> P:{p_inlet}, T:{t_inlet}")
+        debug_log.debug(f"DEBUG: Inlet data loaded -> P:{p_inlet}, T:{t_inlet}")
 
         # 2. Get Exit Boundary Conditions (PDOWN) from the last stage
         if last_stg_idx in radial_data_S:
             last_stg_data = radial_data_S[last_stg_idx]
             p_out_array = last_stg_data['p_S_out']
-            print(f"DEBUG: Pulling PDOWN from Stator {last_stg_idx}")
+            debug_log.debug(f"DEBUG: Pulling PDOWN from Stator {last_stg_idx}")
         elif last_stg_idx in radial_data_R:
             last_stg_data = radial_data_R[last_stg_idx]
             p_out_array = last_stg_data['p_R_out']
-            print(f"DEBUG: Pulling PDOWN from Rotor {last_stg_idx}")
+            debug_log.debug(f"DEBUG: Pulling PDOWN from Rotor {last_stg_idx}")
         else:
             raise KeyError(f"Stage {last_stg_idx} not found in radial data")
 
@@ -505,7 +504,7 @@ def write_end_file(total_rows, file, section, KM, levels, CompressorGui, radial_
         p_exit_tip = round(p_out_array[-1], 1)
 
     except (KeyError, IndexError, AttributeError) as e:
-        print(f"DEBUG: Error accessing stage data: {e}. Using safety fallbacks.")
+        debug_log.debug(f"DEBUG: Error accessing stage data: {e}. Using safety fallbacks.")
         # Engineering fallbacks to prevent crash
         p_exit_hub, p_exit_tip = 101325.0, 101325.0
         t_inlet, p_inlet, um_inlet = 288.15, 101325.0, 150.0
@@ -672,7 +671,7 @@ def generate_var_grid_data(nrow, IM_grid_density, KM_grid_density, JM_grid_densi
             levels=levels)
         
         
-        print(f"DEBUG row_num={row_num}: x_new[0][0]={x_new[0][0]:.4f}, x_new[0][-1]={x_new[0][-1]:.4f}, R_new[0][0]={R_new[0][0]:.6f}")
+        debug_log.debug(f"DEBUG row_num={row_num}: x_new[0][0]={x_new[0][0]:.4f}, x_new[0][-1]={x_new[0][-1]:.4f}, R_new[0][0]={R_new[0][0]:.6f}")
         # x_new_plot, d_new_plot, R_new_plot, Rtheta_new_plot = Stage.calc_blade_row_coordinates(
         #     row=row_num, 
         #     j_prime_max=j_prime_max_plot, 
@@ -782,7 +781,9 @@ def process_grid_data(json_path, CompressorGui):
     output_path = Metadata['output_folder']
     levels = Metadata['levels']
 
-    print(f"DEBUG TIPCLEARENCE tip_clearance_mm_rotor = {tip_clearance_mm_rotor} b2 = {CompressorGui.meanline_data['b2']}")
+    debug_log.open_file(os.path.join(output_path, "debug.txt"))
+
+    debug_log.debug(f"DEBUG TIPCLEARENCE tip_clearance_mm_rotor = {tip_clearance_mm_rotor} b2 = {CompressorGui.meanline_data['b2']}")
     tip_clearance_multall = [tip_clearance_mm_rotor / x for x in CompressorGui.meanline_data['b2']]
 
 
@@ -792,6 +793,19 @@ def process_grid_data(json_path, CompressorGui):
     
     all_rows_grid_data = generate_var_grid_data(nrow_wert, IM_grid_density, KM_grid_density, JM_grid_density, inlet_percentage, outlet_percentage, ref_chord_length, levels, CompressorGui)    
     
+    # --- X RANGE MONOTONICITY CHECK ---
+    debug_log.debug("\n--- X RANGE MONOTONICITY CHECK ---")
+    prev_max_x = -float('inf')
+    all_ok = True
+    for data in all_rows_grid_data:
+        min_x = min(data['x_new'][0])
+        max_x = max(data['x_new'][0])
+        status = "OK" if min_x > prev_max_x else "*** OVERLAP ***"
+        debug_log.debug(f"  Row {data['row_num']}: x=[{min_x:.4f}, {max_x:.4f}]  {status}")
+        if status != "OK":
+            all_ok = False
+        prev_max_x = max_x
+    debug_log.debug(f"  Result: {'PASSED' if all_ok else 'FAILED'}\n")
     
     # old hardcoded first value
     #JM_dynamic_rotor = all_rows_grid_data[0]['JM_dynamic']
@@ -839,13 +853,13 @@ def process_grid_data(json_path, CompressorGui):
         # variable for the stage number
         current_stage = (i // 2) + 1
         
-        print(f"DEBUG: i={i}, row_num={row_num}, current_stage={current_stage}")
+        debug_log.debug(f"DEBUG: i={i}, row_num={row_num}, current_stage={current_stage}")
         
-        print(f"DEBUG row {global_row_num} (stage {current_stage}):")
-        print(f"  x_coords first section first point: {x_coords[0][0]:.4f}")
-        print(f"  x_coords first section last point:  {x_coords[0][-1]:.4f}")
-        print(f"  r_coords first section first point: {r_coords[0][0]:.4f}")
-        print(f"  r_coords first section last point:  {r_coords[0][-1]:.4f}")
+        debug_log.debug(f"DEBUG row {global_row_num} (stage {current_stage}):")
+        debug_log.debug(f"  x_coords first section first point: {x_coords[0][0]:.4f}")
+        debug_log.debug(f"  x_coords first section last point:  {x_coords[0][-1]:.4f}")
+        debug_log.debug(f"  r_coords first section first point: {r_coords[0][0]:.4f}")
+        debug_log.debug(f"  r_coords first section last point:  {r_coords[0][-1]:.4f}")
         
         
         

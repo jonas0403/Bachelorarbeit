@@ -15,6 +15,7 @@ from matplotlib.widgets import Slider
 import tkinter as tk
 from tkinter import filedialog
 import json
+import debug_log
 
 
 import tkinter.messagebox as messagebox
@@ -456,9 +457,9 @@ def init_channel_data(compressor_gui_data):
         # stage's stator outlet x0[7] in the global frame.
         cumulative_x_offset = x0_s[7]
 
-        print(f"Stage {s}: channel stored. "
-              f"x0[1]={x0_s[1]:.1f} mm  x0[7]={x0_s[7]:.1f} mm  "
-              f"→ next offset = {cumulative_x_offset:.1f} mm")
+        debug_log.debug(f"Stage {s}: channel stored. "
+                         f"x0[1]={x0_s[1]:.1f} mm  x0[7]={x0_s[7]:.1f} mm  "
+                         f"→ next offset = {cumulative_x_offset:.1f} mm")
 
 # def init_channel_data(compressor_gui_data):
 #     '''
@@ -676,16 +677,16 @@ def run_main_logic(new_adjustment_data, compressor_gui_data, json_path):# approa
 
 
     # --- DEBUGGING CHECK ---
-    print(f"DEBUG LOOP START: stage_to_calc={compressor_gui_data.stages_to_calc}")
-    print(f"DEBUG TYPE CHECK: b1 is {type(b1)}, cu1 is {type(cu1)}, cm1 is {type(cm1)}")
+    debug_log.debug(f"DEBUG LOOP START: stage_to_calc={compressor_gui_data.stages_to_calc}")
+    debug_log.debug(f"DEBUG TYPE CHECK: b1 is {type(b1)}, cu1 is {type(cu1)}, cm1 is {type(cm1)}")
     
     radial_data_S = {}
     radial_data_R = {}
 
     for s in range(1, compressor_gui_data.stages_to_calc + 1):
-        print(f"--- Processing Stage {s} ---")
+        debug_log.debug(f"--- Processing Stage {s} ---")
         # Verify indexing will work
-        print(f"DEBUG Stage {s}: b1[s-1]={b1[s-1]}")
+        debug_log.debug(f"DEBUG Stage {s}: b1[s-1]={b1[s-1]}")
 
         compressor_gui_data.stage = s
 
@@ -749,7 +750,7 @@ def run_main_logic(new_adjustment_data, compressor_gui_data, json_path):# approa
     print("Successfully calculated meanline and radial equilibrium for all stages")
     ### Debugging Screen to verify correct stage wise implementation of correct calling order
     
-    print(f"VERIFY radial_data_R keys: {list(radial_data_R.keys())}")
+    debug_log.debug(f"VERIFY radial_data_R keys: {list(radial_data_R.keys())}")
     for s in radial_data_R:
         print(f"  stage {s}: l_R[10]={radial_data_R[s]['l_R'][10]:.2f}")
     
@@ -760,7 +761,7 @@ def run_main_logic(new_adjustment_data, compressor_gui_data, json_path):# approa
     """
     # --- DEBUG PRINT START ---
     print("\n" + "="*50)
-    print(f"DEBUG: radial_equilibrium_S Results (Last Stage Calculated: {s})")
+    debug_log.debug(f"DEBUG: radial_equilibrium_S Results (Last Stage Calculated: {s})")
     print("="*50)
 
     # Use the variables ending in _s as they represent the data from the last loop iteration
@@ -1325,7 +1326,7 @@ def calculation_of_section_0_5(row):
     _z_R = radial_data_R[stage].get('z_R', z_R)  # fallback to global if not in dict
     _z_S = radial_data_S[stage].get('z_S', z_S)
     z, s_1D, s_0_5, x_LE, elipse_LE, elipse_TE = overall_values(row, _z_R, _l_R, _l_S)
-    print(f"  VERIFY overall_values [row={row}]: s_1D={s_1D:.4f}") # Temporary Debug call 
+    debug_log.debug(f"  VERIFY overall_values [row={row}]: s_1D={s_1D:.4f}") # Temporary Debug call 
     
     
     # Old logic z, s_1D, s_0_5, x_LE, elipse_LE, elipse_TE = overall_values(row, z_R, l_R, l_S)
@@ -1621,7 +1622,7 @@ def mLE_TE_cntr(row):
     '''
     stage_to_calc = (row - 1) // 2 + 1
     x0 = channel_data[stage_to_calc]['x0']
-    print(f"  VERIFY mLE_TE_cntr [row={row}, stage={stage}]: x0[2]={x0[2]:.4f}, m_LE_0_5 will be={x0[2 if row%2!=0 else 5]:.4f}") # Same verification for correct implemntation of stage by stage calling
+    debug_log.debug(f"  VERIFY mLE_TE_cntr [row={row}, stage={stage_to_calc}]: x0[2]={x0[2]:.4f}, m_LE_0_5 will be={x0[2 if row%2!=0 else 5]:.4f}") # Same verification for correct implemntation of stage by stage calling
     
     if row % 2 != 0:
         k = 2
@@ -1658,7 +1659,7 @@ def calculation_of_section(rel_h, row):
     _z_R = radial_data_R[stage].get('z_R', z_R)  # fallback to global if not in dict
     _z_S = radial_data_S[stage].get('z_S', z_S)
     z, s_1D, s_0_5, x_LE, elipse_LE, elipse_TE = overall_values(row, _z_R, _l_R, _l_S)
-    print(f"  VERIFY overall_values [row={row}]: s_1D={s_1D:.4f}") # Temporary Debug call 
+    debug_log.debug(f"  VERIFY overall_values [row={row}]: s_1D={s_1D:.4f}") # Temporary Debug call 
     
     # Old logic z, s_1D, s_0_5, x_LE, elipse_LE, elipse_TE = overall_values(row, z_R, l_R, l_S)
     
@@ -2036,7 +2037,7 @@ def coordinates(row):
             y_l.append(R_l[-1] * math.cos(R_theta_s_star_l_i[j] / R_l[-1]))
             z_u.append(R_u[-1] * math.sin(R_theta_s_star_u_i[j] / R_u[-1]))
             z_l.append(R_l[-1] * math.sin(R_theta_s_star_l_i[j] / R_l[-1]))
-    print(f"  DEBUG coordinates [{row}]: len(r_values)={len(r_values)}, len(x_values)={len(x_values)}, x_values[0][0]={x_values[0][0]:.4f}, x_values[0][-1]={x_values[0][-1]:.4f}")
+    debug_log.debug(f"  DEBUG coordinates [{row}]: len(r_values)={len(r_values)}, len(x_values)={len(x_values)}, x_values[0][0]={x_values[0][0]:.4f}, x_values[0][-1]={x_values[0][-1]:.4f}")
     
     
     return x_u, R_theta_s_star_u, x_l, R_theta_s_star_l, R_u, beta_S
@@ -2059,7 +2060,7 @@ def calculation_blade_coordinates(j_prime_max, row):
         m_prime_new.append(calculate_m_prime_new(j_prime[i]))
      
     x_u, R_theta_s_star_u, x_l, R_theta_s_star_l, R_u, beta_S = coordinates(row) 
-    print(f"  DEBUG calculation_blade_coordinates [{row}]: x_u[0]={x_u[0]:.4f}, x_u[124]={x_u[124]:.4f}, x_u[125]={x_u[125]:.4f}, len(x_u)={len(x_u)}")
+    debug_log.debug(f"  DEBUG calculation_blade_coordinates [{row}]: x_u[0]={x_u[0]:.4f}, x_u[124]={x_u[124]:.4f}, x_u[125]={x_u[125]:.4f}, len(x_u)={len(x_u)}")
     
     
     x_sec, Rtheta_sec, d_sec, R_sec = [], [], [], []

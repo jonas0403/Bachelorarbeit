@@ -474,7 +474,17 @@ def channel(compressor_gui_data):
     r0_N[7] = round(D_H3/2, 1)
     r0_N[8] = round((r0_N[7] - r0_N[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_N[7], 1)
 
-    r0_G = np.full_like(x0, 0, dtype=float)
+    # r0_G = np.full_like(x0, 0, dtype=float)
+    # r0_G[1] = round(D_S1/2, 1)
+    # r0_G[2] = r0_G[1] + round((D_S2-D_S1)/2*(x0[2]-x0[1])/(x0[4]-x0[1]), 1)
+    # r0_G[0] = round((r0_G[2]-r0_G[1])/(x0[2]-x0[1])*(x0[0]-x0[1])+r0_G[1], 1)
+    # r0_G[3] = r0_G[1] + round((D_S2-D_S1)/2*(x0[3]-x0[1])/(x0[4]-x0[1]), 1)
+    # r0_G[5] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[5]-x0[4])/(x0[7]-x0[4]), 1)
+    # r0_G[4] = round((D_S2/2 + (r0_G[3]+(r0_G[5]-r0_G[3])*(x0[4]-x0[3])/(x0[5]-x0[3])))/2 ,1)
+    # r0_G[6] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[6]-x0[4])/(x0[7]-x0[4]), 1)
+    # r0_G[7] = round(D_S3/2, 1)
+    # r0_G[8] = round((r0_G[7] - r0_G[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_G[7], 1)
+    r0_G = np.full_like(x0, 0)
     r0_G[1] = round(D_S1/2, 1)
     r0_G[2] = r0_G[1] + round((D_S2-D_S1)/2*(x0[2]-x0[1])/(x0[4]-x0[1]), 1)
     r0_G[0] = round((r0_G[2]-r0_G[1])/(x0[2]-x0[1])*(x0[0]-x0[1])+r0_G[1], 1)
@@ -483,20 +493,11 @@ def channel(compressor_gui_data):
     r0_G[4] = round((D_S2/2 + (r0_G[3]+(r0_G[5]-r0_G[3])*(x0[4]-x0[3])/(x0[5]-x0[3])))/2 ,1)
     r0_G[6] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[6]-x0[4])/(x0[7]-x0[4]), 1)
     r0_G[7] = round(D_S3/2, 1)
-    r0_G[8] = round((r0_G[7] - r0_G[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_G[7], 1)
-    # r0_G[1] = round(D_S1/2, 1)
-    # r0_G[2] = r0_G[1] + round((D_S2-D_S1)/2*(x0[2]-x0[1])/(x0[4]-x0[1]), 1)
-    # r0_G[0] = round((r0_G[2]-r0_G[1])/(x0[2]-x0[1])*x0[0]+r0_G[1], 1)
-    # r0_G[3] = r0_G[1]+ round((D_S2-D_S1)/2*(x0[3]-x0[1])/(x0[4]-x0[1]), 1)
-    # r0_G[5] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[5]-x0[4])/(x0[7]-x0[4]), 1)
-    # r0_G[4] = round((D_S2/2 + (r0_G[3]+(r0_G[5]-r0_G[3])*(x0[4]-x0[3])/(x0[5]-x0[3])))/2 ,1)
-    # r0_G[6] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[6]-x0[4])/(x0[7]-x0[4]), 1)
-    # r0_G[7] = round(D_S3/2, 1)
-    # r0_G[8] = round((r0_G[7] - r0_G[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_G[7], 1)   
+    r0_G[8] = round((r0_G[7] - r0_G[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_G[7], 1)   
     
     
     if stage == 1:
-        # Einlass Geometrie
+        # Intake geometry
         r_S1_in = D_S1 / 2
         r_H1_in = D_H1 / 2
         old_area = math.pi * (r_S1_in**2 - r_H1_in**2)
@@ -519,7 +520,7 @@ def channel(compressor_gui_data):
             r0_G[0] = math.sqrt(r_H1_in**2 + new_area / math.pi)
 
     elif stage == i_st:
-        # Auslass Geometry
+        # Outlet geometry
         r_S3_in = D_S3 / 2
         r_H3_in = D_H3 / 2
         old_area = math.pi * (r_S3_in**2 - r_H3_in**2)
@@ -614,7 +615,7 @@ def channel(compressor_gui_data):
     m_prime_N = []
     m_prime_N.append(0.0)
     for i in range(len(t)-1):
-        if t[i] < -1e-6:  # Sicherer Float-Vergleich
+        if t[i] < -1e-6:  
             m_neu = m_prime_N[0] - math.sqrt((x_N[i+1]-x_N[i])**2 + (r_N[i+1]-r_N[i])**2)
             m_prime_N.insert(0,m_neu)
         elif t[i] >= -1e-6:
@@ -631,7 +632,7 @@ def channel(compressor_gui_data):
             m_neu = m_prime_G[i] + math.sqrt((x_G[i+1]-x_G[i])**2+(r_G[i+1]-r_G[i])**2)
             m_prime_G.append(m_neu)
             
-    # Den globalen Offset auf unsere Meridionalstrecke anwenden
+    # add global offset to meridional
     m_prime_N = [m + start_x for m in m_prime_N]
     m_prime_G = [m + start_x for m in m_prime_G]
     
