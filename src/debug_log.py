@@ -50,5 +50,20 @@ def close_file():
         _file_handle.close()
         _file_handle = None
 
+def dump_var(name, value, context=None):
+    if _file_handle is not None:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        prefix = f"[{timestamp}]"
+        if context:
+            prefix += f" [{context}]"
+        if isinstance(value, dict):
+            _write_line(f"{prefix} VAR {name} = dict with {len(value)} keys")
+            for k, v in list(value.items())[:20]:
+                _write_line(f"{prefix}   {k}: {v}")
+        elif isinstance(value, (list, tuple)):
+            _write_line(f"{prefix} VAR {name} = {type(value).__name__}[{len(value)}]: {value[:10]}{'...' if len(value) > 10 else ''}")
+        else:
+            _write_line(f"{prefix} VAR {name} = {value}")
+
 def file_path():
     return _file_path

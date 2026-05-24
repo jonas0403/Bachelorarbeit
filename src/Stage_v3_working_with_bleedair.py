@@ -251,6 +251,13 @@ def create_default_profiles(self, json_path):
         messagebox.showerror("Error", f"An unexpected error occurred: {e}")
 '''
 
+def _gui_messagebox(show_func, title, message):
+    try:
+        if tk._default_root is not None:
+            show_func(title, message)
+    except Exception:
+        pass
+
 def create_default_profiles(self, json_path): 
     gen_msg = "Generating default profiles..."
     print(gen_msg)
@@ -262,7 +269,7 @@ def create_default_profiles(self, json_path):
         except Exception as e:
             import traceback
             traceback.print_exc()
-            messagebox.showerror(
+            _gui_messagebox(messagebox.showerror,
                 "Error",
                 "Please calculate the Meanline (1D Settings) first and make sure it's saved!"
             )
@@ -394,62 +401,62 @@ def create_default_profiles(self, json_path):
                     angles = alpha_S_BP_1 + alpha_S_BP_2 + alpha_S_BP_3 + alpha_S_BP_4
                     angle_key = "alpha_S"
                     debug_log.debug(f"  create_default [stage={stage_num}, STATOR]: angles={[round(v,2) for v in angles]}", context="create_default")
- 
+
                 thickness_combined = [
                     round(float(v), 3)
                     for row_vals in abs_thickness
                     for v in row_vals
                 ]
- 
+
                 return {
                     "h/H":   list(h_H),
                     angle_key: angles,
                     "d/l":   thickness_combined,
                     "m*":    [0.0]*5 + [0.3]*5 + [0.7]*5 + [1.0]*5,
                 }
- 
+
             rotor_dict  = generate_dict_for_stage(is_rotor=True)
             stator_dict = generate_dict_for_stage(is_rotor=False)
- 
+
             # Keys: rotor_stage_1, stator_stage_1, rotor_stage_2, …
             all_bezier_data[f"rotor_stage_{stage_num}"]  = rotor_dict
             all_bezier_data[f"stator_stage_{stage_num}"] = stator_dict
- 
+
             bp_msg = f"Stage {stage_num}: rotor/stator bezier points generated."
             print(bp_msg)
             debug_log.debug(bp_msg, context="create_default_profiles")
- 
+
         # ---- write everything to JSON in one pass ----
         with open(json_path, 'r') as f:
             data = json.load(f)
- 
+
         data["Bezier_point_data"] = all_bezier_data
- 
+
         with open(json_path, 'w') as f:
             json.dump(data, f, indent=4)
- 
+
         # Update in-memory cache on the GUI object
         if hasattr(self, "prepop_bezier_point_rotor"):
             self.prepop_bezier_point_rotor = all_bezier_data.get("rotor_stage_1", {})
             self.prepop_bezier_point_stator = all_bezier_data.get("stator_stage_1", {})
- 
+
         profile_msg = f"Default profiles for {self.stages_to_calc} stage(s) saved to JSON."
         print(profile_msg)
         debug_log.debug(profile_msg, context="create_default_profiles")
-        messagebox.showinfo(
+        _gui_messagebox(messagebox.showinfo,
             "Success",
             f"Default profiles for {self.stages_to_calc} stage(s) successfully created and saved to JSON!"
         )
- 
+
     except NameError as e:
         var_err = f"Variable Error: {e}"
         print(var_err)
         debug_log.debug(var_err, context="create_default_profiles")
-        messagebox.showerror("Error", "Please calculate the Meanline (1D Settings) first! (Debug: #2)")
+        _gui_messagebox(messagebox.showerror, "Error", "Please calculate the Meanline (1D Settings) first! (Debug: #2)")
     except Exception as e:
         import traceback
         traceback.print_exc()
-        messagebox.showerror("Error", f"An unexpected error occurred: {e}")
+        _gui_messagebox(messagebox.showerror, "Error", f"An unexpected error occurred: {e}")
 
 def save_profile(source_filename):
         if not os.path.exists(source_filename):
@@ -2531,7 +2538,7 @@ def coordinates_levels(levels, x, d, R, Rtheta):
         for i in range(len(R[0])):
             XN = [R[0][i], R[1][i], R[2][i], R[3][i], R[4][i], R[5][i], R[6][i]]
             N = len(XN)
-            Z = (R[4][i]-R[0][i])*element + R[0][i]
+            Z = (R[6][i]-R[0][i])*element + R[0][i]
             A = [x[0][i], x[1][i], x[2][i], x[3][i], x[4][i], x[5][i], x[6][i]]
             B = [Rtheta[0][i], Rtheta[1][i], Rtheta[2][i], Rtheta[3][i], Rtheta[4][i],Rtheta[5][i], Rtheta[6][i]]
             C = [d[0][i], d[1][i], d[2][i], d[3][i], d[4][i], d[5][i], d[6][i]]

@@ -320,27 +320,21 @@ def write_head_file(KM_grid_density, IM_grid_density, file_path, section, NROW, 
 
 # Writes the coordinates of all sections to a file for MULTALL
 # MULTALL section geometry writer for a blade row.
-# MULTALL format expects per section:
+# MULTALL format expects per section (confirmed by 10stg-compr-17.4.dat reference):
 #   1. x-coordinates
-#   2. 1.000000  0.000000
-#   3. d-surface-1 (R*theta for one blade surface, e.g. upper/suction)
-#   4. 1.000000
-#   5. d-surface-2 (R*theta for the OTHER blade surface, e.g. lower/pressure)
-#   6. 1.000000  0.000000
+#   2. FAC1=1.0 XSHIFT=0.0
+#   3. Upper surface R*theta
+#   4. FAC2=1.0 TSHIFT=0.0
+#   5. Blade tangential thickness d (= upper - lower), ZERO upstream/downstream of blade
+#   6. FAC3=1.0
 #   7. r-coordinates
+#   8. FAC4=1.0 RSHIFT=0.0
 #
-# BUGFIX: The old code wrote d (blade thickness = upper - lower) in block 5,
-# but MULTALL interprets block 5 as the second surface R*theta coordinate.
-# This made MULTALL see a passage width of ~2.5mm (the thickness) instead of
-# the actual ~28mm (pitch - thickness), causing NaN velocities in the initial guess.
-# Fix: pre-compute lower surface R*theta = rtheta - d and write that instead.
+# NOTE: Card 63 must be BLADE TANGENTIAL THICKNESS d, NOT the lower surface R*theta.
+# MULTALL computes lower_surface = upper_surface - d internally, then derives
+# passage width = pitch - d. Writing the lower surface directly makes MULTALL
+# interpret (rtheta - d) as a huge "thickness" exceeding pitch, causing NaN.
 def write_coordinates(x, rtheta, d, r, file, row, a, b, JM, global_row_num, current_stage):
-    #print(f" DEBUG x r and theta for the first 5 values: {x[0:5]}, {r[0:5]}, {rtheta[0:5]}  and last 5 values = {x[-5:]}, {r[-5:]}, {rtheta[-5:]}")
-    # BUGFIX: pre-compute the lower blade surface R*theta = upper - thickness
-    rtheta_lower = []
-    for sec_idx in range(len(rtheta)):
-        rtheta_lower.append([rtheta[sec_idx][k] - d[sec_idx][k] for k in range(len(rtheta[sec_idx]))])
-    
     with open(file, "a") as file:
         for i in range(a, b):       
             file.write(" ***************************************************************\n")
@@ -349,10 +343,7 @@ def write_coordinates(x, rtheta, d, r, file, row, a, b, JM, global_row_num, curr
             file.write("  1.000000  0.000000\n")
             write_values_in_block(i, rtheta, file, JM)
             file.write("  1.000000\n")
-            # OLD (wrote thickness instead of second surface):
-            # write_values_in_block(i, d, file, JM)
-            # BUGFIX: write the lower blade surface R*theta (= upper - thickness)
-            write_values_in_block(i, rtheta_lower, file, JM)
+            write_values_in_block(i, d, file, JM)
             file.write("  1.000000  0.000000\n")
             write_values_in_block(i, r, file, JM)
             
