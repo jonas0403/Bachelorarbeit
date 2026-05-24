@@ -3,6 +3,7 @@ import subprocess
 import ttkbootstrap as ttk
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+import debug_log
 
 class MultallSimulation:
     def __init__(self, master_window, status_label):
@@ -22,7 +23,9 @@ class MultallSimulation:
             self.working_dir = self.full_file_path
             
             print(f"Multall executable path: {self.working_dir}")
+            debug_log.debug(f"Multall executable path: {self.working_dir}", context="run_multall")
             print(f"Data name: {self.data_name}")
+            debug_log.debug(f"Data name: {self.data_name}", context="run_multall")
             
             self.status_label.config(text=f"Selected Multall Path: {self.working_dir}", foreground="green")
         
@@ -37,7 +40,9 @@ class MultallSimulation:
             self.data_name = self.full_file_path
             
             print(f"Selected file: {self.full_file_path}")
+            debug_log.debug(f"Selected file: {self.full_file_path}", context="run_multall")
             print(f"Data name: {self.data_name}")
+            debug_log.debug(f"Data name: {self.data_name}", context="run_multall")
             
             self.status_label.config(text=f"Selected file: {self.data_name}", foreground="green")
         

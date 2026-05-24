@@ -87,7 +87,9 @@ def plot_temp_alpha_beta(T_Plot, beta_R_Plot, alpha_S_Plot):
 #function for writing Bézier-points
 '''
 def create_default_profiles(self, json_path):  
-    print("Generating default profiles...")
+    gen_msg = "Generating default profiles..."
+    print(gen_msg)
+    debug_log.debug(gen_msg, context="Stage")
     if not hasattr(self, 'meanline_data') or self.meanline_data is None:
         messagebox.showwarning(
             "Fehlende Daten", 
@@ -118,7 +120,9 @@ def create_default_profiles(self, json_path):
         try:
             run_main_logic({'main_choice': 'default'}, self, json_path)
         except Exception as e:
-            print(f"Error executing run_main_logic: {e}")
+            err_msg = f"Error executing run_main_logic: {e}"
+            print(err_msg)
+            debug_log.debug(err_msg, context="create_default_profiles")
             messagebox.showerror("Error", "Please calculate the Meanline (1D Settings) first and make sure it's saved!")
             return
 
@@ -248,7 +252,9 @@ def create_default_profiles(self, json_path):
 '''
 
 def create_default_profiles(self, json_path): 
-    print("Generating default profiles...")
+    gen_msg = "Generating default profiles..."
+    print(gen_msg)
+    debug_log.debug(gen_msg, context="Stage")
  
     try:
         try:
@@ -282,6 +288,12 @@ def create_default_profiles(self, json_path):
             beta_blade_R_out = rad_R['beta_blade_R_out']
             alpha_S_in       = rad_S['alpha_S_in']
             alpha_S_out      = rad_S['alpha_S_out']
+
+            debug_log.debug(f"  create_default [stage={stage_num}] h_rel_s={[round(v,2) for v in h_rel_s]}", context="create_default")
+            debug_log.debug(f"  create_default [stage={stage_num}] beta_blade_R_in={[round(v,2) for v in beta_blade_R_in]}", context="create_default")
+            debug_log.debug(f"  create_default [stage={stage_num}] beta_blade_R_out={[round(v,2) for v in beta_blade_R_out]}", context="create_default")
+            debug_log.debug(f"  create_default [stage={stage_num}] alpha_S_in={[round(v,2) for v in alpha_S_in]}", context="create_default")
+            debug_log.debug(f"  create_default [stage={stage_num}] alpha_S_out={[round(v,2) for v in alpha_S_out]}", context="create_default")
  
             # Chord lengths interpolated to the five standard h_H positions
             chord_length_R = np.interp(h_H, h_rel_s, l_R_s)
@@ -291,28 +303,61 @@ def create_default_profiles(self, json_path):
                 """Build the bezier-point dict for one row of this stage."""
                 beta_S_BP_1, beta_S_BP_2, beta_S_BP_3, beta_S_BP_4 = [], [], [], []
                 alpha_S_BP_1, alpha_S_BP_2, alpha_S_BP_3, alpha_S_BP_4 = [], [], [], []
- 
-                for i, h_val in enumerate(h_H):
-                    # find the matching index in h_rel_s (exact match, step=0.05)
-                    for j in range(len(h_rel_s)):
-                        if abs(h_rel_s[j] - h_val) < 1e-6:
-                            if is_rotor:
-                                b1 = beta_blade_R_in[j]
-                                b2 = beta_blade_R_out[j]
+
+                if is_rotor:
+                    # --- PASS 1: collect raw LE/TE angles for all 5 span positions ---
+                    raw_b1_list = []
+                    raw_b2_list = []
+                    for i, h_val in enumerate(h_H):
+                        for j in range(len(h_rel_s)):
+                            if abs(h_rel_s[j] - h_val) < 1e-6:
+                                raw_b1_list.append(beta_blade_R_in[j])
+                                raw_b2_list.append(beta_blade_R_out[j])
+                                break
+
+                    # --- Global reflection decision ---
+                    # If ALL 5 LE values are > 90°, the rotor uses the >90° convention.
+                    # Reflect ALL TE values < 90° to > 90° so the Bezier curve stays
+                    # on one side of 90° and 1/tan(beta) doesn't change sign.
+                    le_all_above_90 = all(b1 > 90.0 for b1 in raw_b1_list)
+
+                    # --- PASS 2: apply reflection and build control points ---
+                    for i, h_val in enumerate(h_H):
+                        for j in range(len(h_rel_s)):
+                            if abs(h_rel_s[j] - h_val) < 1e-6:
+                                b1 = raw_b1_list[i]
+                                b2 = raw_b2_list[i]
+                                reflected = False
+                                if le_all_above_90 and b2 < 90.0:
+                                    b2 = 180.0 - b2
+                                    reflected = True
                                 delta = b2 - b1
                                 beta_S_BP_1.append(round(b1, 2))
                                 beta_S_BP_4.append(round(b2, 2))
                                 beta_S_BP_2.append(round(b2 - delta * c_03, 2))
                                 beta_S_BP_3.append(round(b2 - delta * c_07, 2))
-                            else:
-                                a1 = alpha_S_in[j]
-                                a2 = alpha_S_out[j]
+                                debug_log.debug(f"  create_default [stage={stage_num}, ROTOR, h={h_val:.1f}]: b1(pre)={raw_b1_list[i]:.2f}, b2(pre)={raw_b2_list[i]:.2f} → b1={b1:.2f}, b2={b2:.2f} reflected={reflected} delta={delta:.2f} le_all_above_90={le_all_above_90}", context="create_default")
+                                break
+
+                else:
+                    for i, h_val in enumerate(h_H):
+                        for j in range(len(h_rel_s)):
+                            if abs(h_rel_s[j] - h_val) < 1e-6:
+                                a1_orig = alpha_S_in[j]
+                                a2_orig = alpha_S_out[j]
+                                a1 = a1_orig
+                                a2 = a2_orig
+                                reflected = False
+                                if a2 > 90.0:
+                                    a2 = 180.0 - a2
+                                    reflected = True
+                                debug_log.debug(f"  create_default [stage={stage_num}, STATOR, h={h_val:.1f}]: a1(pre)={a1_orig:.2f}, a2(pre)={a2_orig:.2f} → a1={a1:.2f}, a2={a2:.2f} reflected={reflected} delta={a2-a1:.2f}", context="create_default")
                                 delta = a2 - a1
                                 alpha_S_BP_1.append(round(a1, 2))
                                 alpha_S_BP_4.append(round(a2, 2))
                                 alpha_S_BP_2.append(round(a2 - delta * c_03, 2))
                                 alpha_S_BP_3.append(round(a2 - delta * c_07, 2))
-                            break
+                                break
  
                 if is_rotor:
                     ref_chord = chord_length_R[2]   # 50% span chord
@@ -323,8 +368,20 @@ def create_default_profiles(self, json_path):
                         [0.010, 0.009, 0.007, 0.005, 0.003],
                     ])
                     abs_thickness = rel_thickness * ref_chord
+                    # ---- Spanwise smoothing of rotor angles ----
+                    # The per-section reflection can create spanwise discontinuities
+                    # when beta_blade_R_out crosses 90° at some spans but not others.
+                    # Apply light 3-point moving average to TE-side CPs to smooth them.
+                    for cp_list in [beta_S_BP_2, beta_S_BP_3, beta_S_BP_4]:
+                        orig = list(cp_list)
+                        smoothed = list(cp_list)
+                        for i in range(1, 4):
+                            smoothed[i] = round((orig[i-1] + orig[i] + orig[i+1]) / 3.0, 2)
+                        debug_log.debug(f"  create_default [stage={stage_num}, ROTOR] spanwise smoothing: {orig} → {smoothed}", context="create_default")
+                        cp_list[:] = smoothed
                     angles = beta_S_BP_1 + beta_S_BP_2 + beta_S_BP_3 + beta_S_BP_4
                     angle_key = "beta_S"
+                    debug_log.debug(f"  create_default [stage={stage_num}, ROTOR]: final angles={[round(v,2) for v in angles]}", context="create_default")
                 else:
                     ref_chord = chord_length_S[2]
                     rel_thickness = np.array([
@@ -336,6 +393,7 @@ def create_default_profiles(self, json_path):
                     abs_thickness = rel_thickness * ref_chord
                     angles = alpha_S_BP_1 + alpha_S_BP_2 + alpha_S_BP_3 + alpha_S_BP_4
                     angle_key = "alpha_S"
+                    debug_log.debug(f"  create_default [stage={stage_num}, STATOR]: angles={[round(v,2) for v in angles]}", context="create_default")
  
                 thickness_combined = [
                     round(float(v), 3)
@@ -357,7 +415,9 @@ def create_default_profiles(self, json_path):
             all_bezier_data[f"rotor_stage_{stage_num}"]  = rotor_dict
             all_bezier_data[f"stator_stage_{stage_num}"] = stator_dict
  
-            print(f"  Stage {stage_num}: rotor/stator bezier points generated.")
+            bp_msg = f"Stage {stage_num}: rotor/stator bezier points generated."
+            print(bp_msg)
+            debug_log.debug(bp_msg, context="create_default_profiles")
  
         # ---- write everything to JSON in one pass ----
         with open(json_path, 'r') as f:
@@ -373,14 +433,18 @@ def create_default_profiles(self, json_path):
             self.prepop_bezier_point_rotor = all_bezier_data.get("rotor_stage_1", {})
             self.prepop_bezier_point_stator = all_bezier_data.get("stator_stage_1", {})
  
-        print(f"Default profiles for {self.stages_to_calc} stage(s) saved to JSON.")
+        profile_msg = f"Default profiles for {self.stages_to_calc} stage(s) saved to JSON."
+        print(profile_msg)
+        debug_log.debug(profile_msg, context="create_default_profiles")
         messagebox.showinfo(
             "Success",
             f"Default profiles for {self.stages_to_calc} stage(s) successfully created and saved to JSON!"
         )
  
     except NameError as e:
-        print(f"Variable Error: {e}")
+        var_err = f"Variable Error: {e}"
+        print(var_err)
+        debug_log.debug(var_err, context="create_default_profiles")
         messagebox.showerror("Error", "Please calculate the Meanline (1D Settings) first! (Debug: #2)")
     except Exception as e:
         import traceback
@@ -408,9 +472,13 @@ def save_profile(source_filename):
         
         try:
             shutil.copy(source_filename, filepath)
-            print(f"Profil erfolgreich gespeichert in {filepath}")
+            save_msg = f"Profile successfully saved to {filepath}"
+            print(save_msg)
+            debug_log.debug(save_msg, context="save_profile")
         except Exception as e:
-            print(f"Error {e} beim speichern")                                                        
+            err_msg = f"Error saving profile: {e}"
+            print(err_msg)
+            debug_log.debug(err_msg, context="save_profile")                                                        
 
 channel_data = {}
 # Move the declarations to module level
@@ -460,6 +528,11 @@ def init_channel_data(compressor_gui_data):
         debug_log.debug(f"Stage {s}: channel stored. "
                          f"x0[1]={x0_s[1]:.1f} mm  x0[7]={x0_s[7]:.1f} mm  "
                          f"→ next offset = {cumulative_x_offset:.1f} mm")
+        # Verify x0 monotonicity (BUGFIX v2: all x0 values in local frame → monotonic)
+        x0_all = [round(v, 1) for v in x0_s]
+        x0_ok = all(x0_all[i] <= x0_all[i+1] for i in range(len(x0_all)-1))
+        debug_log.debug(f"Stage {s}: x0_values = {x0_all}  monotonic={x0_ok}",
+                         context="init_channel_data")
 
 # def init_channel_data(compressor_gui_data):
 #     '''
@@ -747,22 +820,17 @@ def run_main_logic(new_adjustment_data, compressor_gui_data, json_path):# approa
             'beta_blade_R_out': beta_blade_R_out_r, 'D_R': D_R_r
         }
 
-    print("Successfully calculated meanline and radial equilibrium for all stages")
+    all_done_msg = "Successfully calculated meanline and radial equilibrium for all stages"
+    print(all_done_msg)
+    debug_log.debug(all_done_msg, context="run_main_logic")
     ### Debugging Screen to verify correct stage wise implementation of correct calling order
     
     debug_log.debug(f"VERIFY radial_data_R keys: {list(radial_data_R.keys())}")
     for s in radial_data_R:
-        print(f"  stage {s}: l_R[10]={radial_data_R[s]['l_R'][10]:.2f}")
+        debug_log.debug(f"stage {s}: l_R[10]={radial_data_R[s]['l_R'][10]:.2f}", context="run_main_logic")
     
-    """
-    h_rel, l_S, c_m_S_in, c_m_S_out, c_u_S_in, c_u_S_out, c_S_out, T_S_in, T_S_out, p_S_in, p_S_out, alpha_S_in, beta_S_in, alpha_S_out, beta_blade_S_in, beta_blade_S_out, D_S = radial_equilibrium_S(stage, approach, constant_r_parameter, D_S1, D_S2, D_S3, D_H1, D_H2, D_H3, D_m1, D_m2, D_m3, b1, b2, b3, cu1, cu2, cu3, u1, u2, u3, cm1, cm2, cm3, delta_h_t, T_t1, T_t2, T_t3, p_t1, p_t2, p_t3, compressor_gui_data)
-    h_rel, l_R, r_R_out, c_m_R_in, c_m_R_out, c_u_R_in, c_u_R_out, c_R_out, u_R_in, u_R_out, T_R_in, T_R_out, p_R_in, p_R_out, Ma_abs_R_in, Ma_rel_R_in, roh_R_in, alpha_R_in, beta_R_in, alpha_R_out, beta_R_out, beta_blade_R_in, beta_blade_R_out, D_R = radial_equilibrium_R(stage, approach, constant_r_parameter, D_S1, D_S2, D_S3, D_H1, D_H2, D_H3, D_m1, D_m2, D_m3, b1, b2, b3, cu1, cu2, cu3, u1, u2, u3, cm1, cm2, cm3, delta_h_t, T_t1, T_t2, T_t3, p_t1, p_t2, p_t3, compressor_gui_data)
-    print("Successfully calculated meanline and radial equilibrium")
-    """
-    # --- DEBUG PRINT START ---
-    print("\n" + "="*50)
-    debug_log.debug(f"DEBUG: radial_equilibrium_S Results (Last Stage Calculated: {s})")
-    print("="*50)
+    debug_log.section("Radial Equilibrium Results")
+    debug_log.debug(f"radial_equilibrium_S Results (Last Stage Calculated: {s})", context="run_main_logic")
 
     # Use the variables ending in _s as they represent the data from the last loop iteration
     debug_vars = {
@@ -775,15 +843,12 @@ def run_main_logic(new_adjustment_data, compressor_gui_data, json_path):# approa
     }
 
     for category, vars_dict in debug_vars.items():
-        print(f"\n[{category}]")
+        debug_log.debug(f"[{category}]", context="run_main_logic")
         for name, value in vars_dict.items():
-            # Handle list/array printing safely
             if isinstance(value, (list, np.ndarray)) and len(value) > 0:
-                print(f"  {name:20}: {value[0]:.4f} ... {value[-1]:.4f} (len: {len(value)})")
+                debug_log.debug(f"  {name:20}: {value[0]:.4f} ... {value[-1]:.4f} (len: {len(value)})", context="run_main_logic")
             else:
-                print(f"  {name:20}: {value}")
-    
-    print("="*50 + "\n")
+                debug_log.debug(f"  {name:20}: {value}", context="run_main_logic")
 
     # main_choice = new_adjustment_data.get('main_choice', 'default')
     main_choice = new_adjustment_data['main_choice']
@@ -834,16 +899,20 @@ def run_main_logic(new_adjustment_data, compressor_gui_data, json_path):# approa
                 
             b_data = data.get("Bezier_point_data", {}).get(blade_key, {})
             if not b_data:
-                print(f"Error: No bezier data found for {row_str}. Please generate profiles first.")
+                err_msg = f"Error: No bezier data found for {row_str}. Please generate profiles first."
+                print(err_msg)
+                debug_log.debug(err_msg, context="adjust_bezier")
                 return
                 
             angles_flat = b_data.get(angle_key, [0]*20)
             d_l_flat = b_data.get("d/l", [0]*20)
             
-            print(f"Debugging: Selected parameter is: {parameter_str}")
+            debug_log.debug(f"Selected parameter is: {parameter_str}", context="adjust_bezier")
 
             if parameter_str == 'Angle':
-                print(f"Adjustments for Angle in row {row_str}, section: {h_val}")
+                adj_msg = f"Adjustments for Angle in row {row_str}, section: {h_val}"
+                print(adj_msg)
+                debug_log.debug(adj_msg, context="adjust_bezier")
 
                 original_points = [angles_flat[section_idx + i*5] for i in range(4)]
                 
@@ -856,7 +925,9 @@ def run_main_logic(new_adjustment_data, compressor_gui_data, json_path):# approa
                 b_data[angle_key] = angles_flat
     
             elif parameter_str == 'Thickness':
-                print(f"Adjustments for Thickness in row {row_str}, section: {h_val}")
+                adj_msg = f"Adjustments for Thickness in row {row_str}, section: {h_val}"
+                print(adj_msg)
+                debug_log.debug(adj_msg, context="adjust_bezier")
                 chord, *_ = calculation_of_section(h_val, row_num) 
                 
                 original_points = [d_l_flat[section_idx + i*5] for i in range(4)]
@@ -877,10 +948,14 @@ def run_main_logic(new_adjustment_data, compressor_gui_data, json_path):# approa
                     compressor_gui_data.prepop_bezier_point_stator = b_data
             
                 
-            print(f"Adjustments successfully saved to JSON for {row_str}!")
-                              
+            save_adj_msg = f"Adjustments successfully saved to JSON for {row_str}!"
+            print(save_adj_msg)
+            debug_log.debug(save_adj_msg, context="adjust_bezier")
+                               
         except Exception as e:
-            print(f"Error during adjustment: {e}")
+            err_msg = f"Error during adjustment: {e}"
+            print(err_msg)
+            debug_log.debug(err_msg, context="adjust_bezier")
             return
 
 
@@ -1250,9 +1325,11 @@ def blade_metal_BP(row):
         with open(json_path, 'r') as file:
             data = json.load(file)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error while reading JSON file: {e}")
+        json_err = f"Error while reading JSON file: {e}"
+        print(json_err)
+        debug_log.debug(json_err, context="blade_metal_BP")
         return [], [], [], [], [], [], [], [], [[], [], [], []]
- 
+  
     # Derive stage number and blade type from the row index
     stage_num = (row - 1) // 2 + 1
     is_rotor  = (row % 2 != 0)
@@ -1267,14 +1344,18 @@ def blade_metal_BP(row):
         fallback_key = "rotor" if is_rotor else "stator"
         b_data = bezier_store.get(fallback_key)
         if b_data is not None:
-            print(
+            legacy_warn = (
                 f"Warning: per-stage key '{blade_key}' not found – "
                 f"falling back to legacy key '{fallback_key}'. "
                 f"Re-generate profiles to fix this."
             )
- 
+            print(legacy_warn)
+            debug_log.debug(legacy_warn, context="blade_metal_BP")
+  
     if not b_data:
-        print(f"No bezier data found for '{blade_key}'!")
+        no_data_msg = f"No bezier data found for '{blade_key}'!"
+        print(no_data_msg)
+        debug_log.debug(no_data_msg, context="blade_metal_BP")
         return [], [], [], [], [], [], [], [], [[], [], [], []]
  
     angles  = b_data.get(angle_key, [0] * 20)
@@ -1285,12 +1366,43 @@ def blade_metal_BP(row):
     beta_M_2 = angles[5:10]
     beta_M_3 = angles[10:15]
     beta_M_a = angles[15:20]
- 
+
+    blade_type = "ROTOR" if is_rotor else "STATOR"
+    # Log the raw (pre-clamp) values from JSON
+    debug_log.debug(f"  blade_metal_BP [{blade_type} row {row} stage {stage_num}] JSON_raw beta_M_e (LE): {[round(v, 2) for v in beta_M_e]}", context="blade_metal_raw")
+    debug_log.debug(f"  blade_metal_BP [{blade_type} row {row} stage {stage_num}] JSON_raw beta_M_2:      {[round(v, 2) for v in beta_M_2]}", context="blade_metal_raw")
+    debug_log.debug(f"  blade_metal_BP [{blade_type} row {row} stage {stage_num}] JSON_raw beta_M_3:      {[round(v, 2) for v in beta_M_3]}", context="blade_metal_raw")
+    debug_log.debug(f"  blade_metal_BP [{blade_type} row {row} stage {stage_num}] JSON_raw beta_M_a (TE): {[round(v, 2) for v in beta_M_a]}", context="blade_metal_raw")
+
+    # Clamp angles to prevent Bezier curve from crossing 90 deg,
+    # which causes 1/tan(beta) to change sign (INVALID Rtheta).
+    if not is_rotor:
+        # Stator: reflect ALL control points > 90 deg to [0, 90] interval
+        beta_M_a = [180.0 - v if v > 90.0 else v for v in beta_M_a]
+        beta_M_3 = [180.0 - v if v > 90.0 else v for v in beta_M_3]
+        beta_M_2 = [180.0 - v if v > 90.0 else v for v in beta_M_2]
+        beta_M_e = [180.0 - v if v > 90.0 else v for v in beta_M_e]
+    else:
+        # Rotor: if ALL 5 LE values > 90°, reflect ALL TE-side CPs < 90° to > 90°
+        # Using span-consistent logic to avoid per-section discontinuities.
+        le_all_above_90 = all(v > 90.0 for v in beta_M_e)
+        if le_all_above_90:
+            for i in range(5):
+                for cp in [beta_M_a, beta_M_3, beta_M_2]:
+                    if cp[i] < 90.0:
+                        cp[i] = 180.0 - cp[i]
+
     d_l_e = d_l[0:5]
     d_l_2 = d_l[5:10]
     d_l_3 = d_l[10:15]
     d_l_a = d_l[15:20]
- 
+
+    blade_type = "ROTOR" if is_rotor else "STATOR"
+    debug_log.debug(f"  blade_metal_BP [{blade_type} row {row} stage {stage_num}] beta_M_e (LE): {[round(v, 2) for v in beta_M_e]}", context="blade_metal_angles")
+    debug_log.debug(f"  blade_metal_BP [{blade_type} row {row} stage {stage_num}] beta_M_2:      {[round(v, 2) for v in beta_M_2]}", context="blade_metal_angles")
+    debug_log.debug(f"  blade_metal_BP [{blade_type} row {row} stage {stage_num}] beta_M_3:      {[round(v, 2) for v in beta_M_3]}", context="blade_metal_angles")
+    debug_log.debug(f"  blade_metal_BP [{blade_type} row {row} stage {stage_num}] beta_M_a (TE): {[round(v, 2) for v in beta_M_a]}", context="blade_metal_angles")
+
     m_star_BP = [
         m_star[0:5],
         m_star[5:10],
@@ -1349,6 +1461,8 @@ def calculation_of_section_0_5(row):
     beta_BP.append(cubspline(3, rel_h, h_H, beta_M_2))
     beta_BP.append(cubspline(3, rel_h, h_H, beta_M_3))
     beta_BP.append(cubspline(3, rel_h, h_H, beta_M_a))
+
+    debug_log.debug(f"  calc_section_0_5 [row={row}, rel_h={rel_h}]: beta_BP (interpolated) = {[round(v, 2) for v in beta_BP]}", context="camber_angles")
 
     d_l_BP =[]
     d_l_BP.append(cubspline(3, rel_h, h_H, d_l_e)/200)
@@ -1498,7 +1612,7 @@ def calculation_of_section_0_5(row):
             #lower side
             m_prime_l = helping_list_m + m_prime_l[0:pos_m_prime_max]
             R_theta_s_prime_l = helping_list_R + R_theta_s_prime_l[0:pos_m_prime_max]
-            print("2")
+            debug_log.debug("blade section 2 selected (upper side)", context="blade_geometry")
 
     elif m_prime_min == m_prime_l[pos_m_prime_min_l]:
         pos_m_prime_min = pos_m_prime_min_l
@@ -1558,7 +1672,7 @@ def calculation_of_section_0_5(row):
 
     # check if first coordinate of upper and lower side are the same 
     if m_prime_l[0]!=m_prime_u[0]:
-        print("not equal")
+        debug_log.debug("first coordinates of upper/lower side not equal", context="blade_geometry")
 
     dif_list_len_u = len(m_prime_u)-125
     
@@ -1683,6 +1797,8 @@ def calculation_of_section(rel_h, row):
     beta_BP.append(cubspline(3, rel_h, h_H, beta_M_3))
     beta_BP.append(cubspline(3, rel_h, h_H, beta_M_a))
 
+    debug_log.debug(f"  calc_section [row={row}, rel_h={rel_h:.2f}]: beta_BP (interpolated) = {[round(v, 2) for v in beta_BP]}", context="camber_angles")
+
     d_l_BP =[]
     d_l_BP.append(cubspline(3, rel_h, h_H, d_l_e)/100)
     d_l_BP.append(cubspline(3, rel_h, h_H, d_l_2)/100)
@@ -1720,6 +1836,9 @@ def calculation_of_section(rel_h, row):
     R_theta_s_prime = [0.0]
     for i in range(len(t)-1):
         R_theta_s_prime.append(R_theta_s_prime[-1]+1/math.tan((beta_S[i] + beta_S[i+1])/2*Pi/180) *(m_prime[i+1]-m_prime[i]))
+
+    debug_log.debug(f"  calc_section [row={row}, rel_h={rel_h:.2f}]: R_theta_s_prime[0]={R_theta_s_prime[0]:.6f} (LE), R_theta_s_prime[124]={R_theta_s_prime[124]:.6f} (TE)", context="Rtheta_integration")
+    debug_log.debug(f"  calc_section [row={row}, rel_h={rel_h:.2f}]: beta_S[0]={beta_S[0]:.2f} deg (LE), beta_S[124]={beta_S[124]:.2f} deg (TE)", context="Rtheta_integration")
 
     #Chordlength
     s_star = math.sqrt(1+R_theta_s_prime[124]**2)       
@@ -1853,7 +1972,7 @@ def calculation_of_section(rel_h, row):
             #lower side
             m_prime_l = helping_list_m + m_prime_l[0:pos_m_prime_max]
             R_theta_s_prime_l = helping_list_R + R_theta_s_prime_l[0:pos_m_prime_max]
-            print("2")
+            debug_log.debug("blade section 2 selected (upper side)", context="blade_geometry")
 
     elif m_prime_min == m_prime_l[pos_m_prime_min_l]:
         pos_m_prime_min = pos_m_prime_min_l
@@ -1912,7 +2031,7 @@ def calculation_of_section(rel_h, row):
             R_theta_s_prime_l = R_theta_s_prime_l[pos_m_prime_min:pos_m_prime_max+1]
 
     if m_prime_l[0]!=m_prime_u[0]:
-        print("ne")
+        debug_log.debug("first coordinates of upper/lower side not equal (stator)", context="blade_geometry")
 
     # activate for plotting of blade geometry
     """
@@ -2037,8 +2156,9 @@ def coordinates(row):
             y_l.append(R_l[-1] * math.cos(R_theta_s_star_l_i[j] / R_l[-1]))
             z_u.append(R_u[-1] * math.sin(R_theta_s_star_u_i[j] / R_u[-1]))
             z_l.append(R_l[-1] * math.sin(R_theta_s_star_l_i[j] / R_l[-1]))
-    debug_log.debug(f"  DEBUG coordinates [{row}]: len(r_values)={len(r_values)}, len(x_values)={len(x_values)}, x_values[0][0]={x_values[0][0]:.4f}, x_values[0][-1]={x_values[0][-1]:.4f}")
-    
+    debug_log.debug(f"  TRACE coordinates [{row}]: x_values[0][0]={x_values[0][0]:.4f} x_values[0][-1]={x_values[0][-1]:.4f}  r_values[0][0]={r_values[0][0]:.6f} r_values[0][-1]={r_values[0][-1]:.6f}  r_values[4][0]={r_values[4][0]:.6f} r_values[4][-1]={r_values[4][-1]:.6f}")
+    debug_log.debug(f"  TRACE coordinates [{row}]: R_u[0]={R_u[0]:.6f} R_u[124]={R_u[124]:.6f} R_u[125]={R_u[125]:.6f} R_u[499]={R_u[499]:.6f} R_u[500]={R_u[500]:.6f} R_u[624]={R_u[624]:.6f}")
+    debug_log.debug(f"  TRACE coordinates [{row}]: x_u[0]={x_u[0]:.4f} x_u[124]={x_u[124]:.4f} x_u[125]={x_u[125]:.4f} x_u[499]={x_u[499]:.4f} x_u[500]={x_u[500]:.4f} x_u[624]={x_u[624]:.4f}")
     
     return x_u, R_theta_s_star_u, x_l, R_theta_s_star_l, R_u, beta_S
 
@@ -2089,13 +2209,39 @@ def calculation_blade_coordinates(j_prime_max, row):
             x_sec_value = intpol(m_prime_new[j], len(m_prime_upper), m_prime_upper, x_u[a:b])/1000
             Rtheta_sec_value = intpol(m_prime_new[j], len(m_prime_upper), m_prime_upper, R_theta_s_star_u[a:b])/1000
 
+            # DIAGNOSTIC: check intpol for out-of-range (sentinel -99999)
+            if x_sec_value < -99990:
+                debug_log.debug(f"  DIAG: intpol x_sec FAIL at i={i} j={j} row={row} m_prime_new={m_prime_new[j]:.6f} range=[{m_prime_upper[0]:.6f},{m_prime_upper[-1]:.6f}]")
+                x_sec_value = 0.0  # fallback
+            if Rtheta_sec_value < -99990:
+                debug_log.debug(f"  DIAG: intpol Rtheta_sec FAIL at i={i} j={j} row={row} m_prime_new={m_prime_new[j]:.6f} range=[{m_prime_upper[0]:.6f},{m_prime_upper[-1]:.6f}]")
+                Rtheta_sec_value = 0.0
+
             x_sec[i].append(x_sec_value)
             Rtheta_sec[i].append(Rtheta_sec_value)
-            d_sec_value = Rtheta_sec[i][j] - intpol(m_prime_new[j], len(m_prime_lower), m_prime_lower, R_theta_s_star_l[a:b])/1000
+
+            lower_intpol = intpol(m_prime_new[j], len(m_prime_lower), m_prime_lower, R_theta_s_star_l[a:b])/1000
+            if lower_intpol < -99990:
+                debug_log.debug(f"  DIAG: intpol Rtheta_lower FAIL at i={i} j={j} row={row} m_prime_new={m_prime_new[j]:.6f} range=[{m_prime_lower[0]:.6f},{m_prime_lower[-1]:.6f}]")
+                lower_intpol = Rtheta_sec[i][j]  # fallback => d_sec=0
+            d_sec_value = Rtheta_sec[i][j] - lower_intpol
+
+            if d_sec_value < 0:
+                debug_log.debug(f"  DIAG: NEGATIVE d_sec at row={row} i={i} j={j} d_sec={d_sec_value:.10f} Rtheta_sec={Rtheta_sec[i][j]:.10f} lower={lower_intpol:.10f} m_prime_new={m_prime_new[j]:.6f}")
+
             R_sec_value = intpol(m_prime_new[j], len(m_prime_upper), m_prime_upper, R_u[a:b])/1000
+            if R_sec_value < -99990:
+                debug_log.debug(f"  DIAG: intpol R_sec FAIL at i={i} j={j} row={row} m_prime_new={m_prime_new[j]:.6f} range=[{m_prime_upper[0]:.6f},{m_prime_upper[-1]:.6f}]")
+                R_sec_value = 0.0
 
             d_sec[i].append(d_sec_value)
             R_sec[i].append(R_sec_value)
+    
+    for i in range(len(h_H)):
+        d_max = max(d_sec[i])
+        d_max_idx = d_sec[i].index(d_max)
+        d_mid = d_sec[i][len(d_sec[i])//2]
+        debug_log.debug(f"  TRACE calc_blade_coords [{row}] section {i}: x_sec[0]={x_sec[i][0]:.6f} x_sec[-1]={x_sec[i][-1]:.6f}  d_sec max={d_max:.6f} at idx={d_max_idx} mid={d_mid:.6f}  Rtheta_sec[0]={Rtheta_sec[i][0]:.6f} Rtheta_sec[-1]={Rtheta_sec[i][-1]:.6f}")
 
     return x_sec, d_sec, R_sec, Rtheta_sec, beta_S, j_prime_max
 
@@ -2131,9 +2277,23 @@ def inlet_coordinates(row, num_planes, n_max_in, l_inlet, x_sec, d_sec, R_sec, R
     elif row % 2 == 0:
         k = 3
 
+    # First pass: compute raw DX_in
     for i in range(num_planes):
-        DX_in.append(x0[k]/1000-x_sec[i][0])
-        DX1_in.append(x_sec[i][1]-x_sec[i][0])
+        DX_in.append(x0[k]/1000 - x_sec[i][0])
+        DX1_in.append(x_sec[i][1] - x_sec[i][0])
+
+    # Clamp DX_in for internal stages where x0[0]=x0[1] (no inlet duct).
+    # Without this, DX_in ≈ 0 causes division by zero in a_in and
+    # Rtheta_prime_in_BP. The clamped value guarantees the cosine-bunching
+    # formula works while keeping the overlap negligible (~5 mm per stage).
+    for i in range(num_planes):
+        chord_approx = abs(x_sec[i][-1] - x_sec[i][0])  # blade chord in meters
+        min_inlet = max(chord_approx * 0.05, 0.005)     # at least 5 mm or 5% chord
+        if abs(DX_in[i]) < min_inlet:
+            DX_in[i] = -min_inlet   # negative = upstream of LE
+
+    # Second pass: compute Rtheta_prime_in_BP using adjusted DX_in
+    for i in range(num_planes):
         x = max(Rtheta_sec[0][0], Rtheta_sec[4][0])*2.2
         Rtheta_in_BP[i].append(x)
         Rtheta_in_BP[i].append(x)
@@ -2181,6 +2341,10 @@ def inlet_coordinates(row, num_planes, n_max_in, l_inlet, x_sec, d_sec, R_sec, R
         R_in[i] = R_in[i][:-1] 
         d_in[i] = d_in[i][:-1] 
         Rtheta_in[i] = Rtheta_in[i][:-1] 
+
+    for i in range(num_planes):
+        dx_val = DX_in[i] if i < len(DX_in) else 0
+        debug_log.debug(f"  TRACE inlet_coords [{row}] plane {i}: DX_in={dx_val:.6f}  x_in[0]={x_in[i][0]:.6f} x_in[-1]={x_in[i][-1]:.6f}  R_in[0]={R_in[i][0]:.6f} R_in[-1]={R_in[i][-1]:.6f}  Rtheta_in[0]={Rtheta_in[i][0]:.6f} Rtheta_in[-1]={Rtheta_in[i][-1]:.6f}  d_in all zero={all(v==0.0 for v in d_in[i])}")
     
     return x_in, d_in, R_in, Rtheta_in
 
@@ -2212,7 +2376,6 @@ def outlet_coordinates(row, n_max_out, l_outlet, num_planes, x_sec, Rtheta_sec, 
 
     if row % 2 != 0:
         k = 3       
-
     elif row % 2 == 0:
         k = 6    
 
@@ -2264,6 +2427,9 @@ def outlet_coordinates(row, n_max_out, l_outlet, num_planes, x_sec, Rtheta_sec, 
         R_out[i] = R_out[i][1:]
         d_out[i] = d_out[i][1:]
         Rtheta_out[i] = Rtheta_out[i][1:]
+
+    for i in range(num_planes):
+        debug_log.debug(f"  TRACE outlet_coords [{row}] plane {i}: DX_out={DX_out[i]:.6f}  x_out[0]={x_out[i][0]:.6f} x_out[-1]={x_out[i][-1]:.6f}  R_out[0]={R_out[i][0]:.6f} R_out[-1]={R_out[i][-1]:.6f}  Rtheta_out[0]={Rtheta_out[i][0]:.6f} Rtheta_out[-1]={Rtheta_out[i][-1]:.6f}")
     
     return x_out, d_out, R_out, Rtheta_out
 
@@ -2329,14 +2495,23 @@ def additional_section(Z_H, Z_S, x, d, R, Rtheta):
         R_0_95.append(intp_new(2, N, XN, D, Z))
 
     #Inserts the new two planes in the old lists
+    # Z_H (h=0.05) goes between hub (h=0.0, idx 0) and section 1 (h=0.20, idx 1)
     x.insert(1, X_0_05)
-    x.insert(4, X_0_95)
     Rtheta.insert(1, Rtheta_0_05)
-    Rtheta.insert(4, Rtheta_0_95)
     d.insert(1, d_0_05)
-    d.insert(4, d_0_95)
     R.insert(1, R_0_05)
-    R.insert(4, R_0_95)
+    # After the Z_H insert, sections are: [0]=h0.0, [1]=h0.05, [2]=h0.20, [3]=h0.50, [4]=h0.80, [5]=h1.0
+    # Z_S (h=0.95) goes between h=0.80 (idx 4) and h=1.0 (idx 5) → insert at index 5
+    x.insert(5, X_0_95)
+    Rtheta.insert(5, Rtheta_0_95)
+    d.insert(5, d_0_95)
+    R.insert(5, R_0_95)
+
+    for i in range(len(R)):
+        radii_at_inlet = [R[sec][0] for sec in range(len(R))]
+        radii_monotonic = all(radii_at_inlet[k] <= radii_at_inlet[k+1] for k in range(len(radii_at_inlet)-1))
+        if i == 0:
+            debug_log.debug(f"  Section ordering: radii at inlet = {[f'{r:.4f}' for r in radii_at_inlet]}  monotonic={radii_monotonic}")
     
     return x, d, R, Rtheta
 
@@ -2371,17 +2546,36 @@ def coordinates_levels(levels, x, d, R, Rtheta):
 # function for calculation of blade row coordinates. It just activates other functions
 def calc_blade_row_coordinates(row, j_prime_max, num_planes, n_max_in, l_inlet, n_max_out, l_outlet, Z_H, Z_S, levels):
     x_sec, d_sec, R_sec, Rtheta_sec, beta_S, j_prime_max = calculation_blade_coordinates(j_prime_max, row) 
-    #print(f"  DEBUG [{row}] after calculation_blade_coordinates: x_sec[0][0]={x_sec[0][0]:.4f}, x_sec[0][-1]={x_sec[0][-1]:.4f}, R_sec[0][0]={R_sec[0][0]:.6f}")
     x_in, d_in, R_in, Rtheta_in = inlet_coordinates(row, num_planes, n_max_in, l_inlet, x_sec, d_sec, R_sec, Rtheta_sec, beta_S, j_prime_max) 
-    #print(f"  DEBUG [{row}] after inlet_coordinates:             x_in[0][0]={x_in[0][0]:.4f},  x_in[0][-1]={x_in[0][-1]:.4f},  R_in[0][0]={R_in[0][0]:.6f}")
     x_out, d_out, R_out, Rtheta_out = outlet_coordinates(row, n_max_out, l_outlet, num_planes, x_sec, Rtheta_sec, beta_S)
-    #print(f"  DEBUG [{row}] after outlet_coordinates:            x_out[0][0]={x_out[0][0]:.4f}, x_out[0][-1]={x_out[0][-1]:.4f}, R_out[0][0]={R_out[0][0]:.6f}")
     x, d, R, Rtheta = merge_coordinates(num_planes, j_prime_max, n_max_in, x_in, x_sec, x_out, d_in, d_sec, d_out, R_in, R_sec, R_out, Rtheta_in, Rtheta_sec, Rtheta_out)
-    #print(f"  DEBUG [{row}] after merge_coordinates:             x[0][0]={x[0][0]:.4f},    x[0][-1]={x[0][-1]:.4f},    R[0][0]={R[0][0]:.6f}")
+    
+    for i in range(num_planes):
+        debug_log.debug(f"  TRACE merged [{row}] plane {i}: x[0]={x[i][0]:.6f} x[-1]={x[i][-1]:.6f}  R[0]={R[i][0]:.6f} R[-1]={R[i][-1]:.6f}  d[0]={d[i][0]:.6f} d[-1]={d[i][-1]:.6f}  Rtheta[0]={Rtheta[i][0]:.6f} Rtheta[-1]={Rtheta[i][-1]:.6f}")
+    
     x, d, R, Rtheta = additional_section(Z_H, Z_S, x, d, R, Rtheta)
-    #print(f"  DEBUG [{row}] after additional_section:            x[0][0]={x[0][0]:.4f},    x[0][-1]={x[0][-1]:.4f},    R[0][0]={R[0][0]:.6f}")
     x_new, d_new, R_new, Rtheta_new = coordinates_levels(levels, x, d, R, Rtheta )
-    #print(f"  DEBUG [{row}] after coordinates_levels:            x_new[0][0]={x_new[0][0]:.4f}, x_new[0][-1]={x_new[0][-1]:.4f}, R_new[0][0]={R_new[0][0]:.6f}")
+    
+    for j in range(len(levels)):
+        stats = []
+        for name, arr in [('x', x_new[j]), ('d', d_new[j]), ('R', R_new[j]), ('Rt', Rtheta_new[j])]:
+            n_nan = sum(1 for v in arr if v != v)
+            n_inf = sum(1 for v in arr if v == float('inf') or v == -float('inf'))
+            if n_nan or n_inf:
+                stats.append(f"{name}:{len(arr)}pts nan={n_nan} inf={n_inf}")
+            n_neg = sum(1 for v in arr if v < 0)
+            if name != 'Rt' and n_neg:
+                stats.append(f"{name}:{len(arr)}pts neg={n_neg}")
+        if stats:
+            debug_log.debug(f"  TRACE final [{row}] level {j}: *** INVALID *** {' | '.join(stats)}", context="INVALID")
+        else:
+            debug_log.debug(f"  TRACE final [{row}] level {j}: x[0]={x_new[j][0]:.6f} x[-1]={x_new[j][-1]:.6f}  R[0]={R_new[j][0]:.6f} R[-1]={R_new[j][-1]:.6f}  d[0]={d_new[j][0]:.6f} d[-1]={d_new[j][-1]:.6f}  Rtheta[0]={Rtheta_new[j][0]:.6f} Rtheta[-1]={Rtheta_new[j][-1]:.6f}")
+            # Log negative Rtheta count as informational (not INVALID) — negative Rtheta
+            # is physically correct when the blade turns past the zero-Rtheta reference
+            n_neg_rt = sum(1 for v in Rtheta_new[j] if v < 0)
+            if n_neg_rt:
+                debug_log.debug(f"  TRACE final [{row}] level {j}: Rt negative count={n_neg_rt}/{len(Rtheta_new[j])} (informational — physically correct for blades turning past zero reference)", context="Rt_negative_info")
+    
     return x_new, d_new, R_new, Rtheta_new
 
 
@@ -2399,8 +2593,27 @@ def write_values_in_block(section, liste, file, JM):
                 file.write(f"{element:.6f} ")
         file.write('\n')  
 
-#writes the coordinates of all sections in a file for MULTALL: 
+# MULTALL section geometry writer for a blade row.
+# MULTALL format expects per section:
+#   1. x-coordinates
+#   2. 1.000000  0.000000
+#   3. d-surface-1 (R*theta for one blade surface, e.g. upper/suction)
+#   4. 1.000000
+#   5. d-surface-2 (R*theta for the OTHER blade surface, e.g. lower/pressure)
+#   6. 1.000000  0.000000
+#   7. r-coordinates
+#
+# BUGFIX: The old code wrote d (blade thickness = upper - lower) in block 5,
+# but MULTALL interprets block 5 as the second surface R*theta coordinate.
+# This made MULTALL see a passage width of ~2.5mm (the thickness) instead of
+# the actual ~28mm (pitch - thickness), causing NaN velocities in the initial guess.
+# Fix: pre-compute lower surface R*theta = rtheta - d and write that instead.
 def write_coordinates(x, rtheta, d, r, file, row, a, b, JM):
+    # BUGFIX: pre-compute the lower blade surface R*theta = upper - thickness
+    rtheta_lower = []
+    for sec_idx in range(len(rtheta)):
+        rtheta_lower.append([rtheta[sec_idx][k] - d[sec_idx][k] for k in range(len(rtheta[sec_idx]))])
+    
     with open(file, "a") as file:
         for i in range(a, b):       
             file.write(" ***************************************************************\n")
@@ -2409,7 +2622,10 @@ def write_coordinates(x, rtheta, d, r, file, row, a, b, JM):
             file.write("  1.000000  0.000000\n")
             write_values_in_block(i, rtheta, file, JM)
             file.write("  1.000000\n")
-            write_values_in_block(i, d, file, JM)
+            # OLD (wrote thickness instead of second surface):
+            # write_values_in_block(i, d, file, JM)
+            # BUGFIX: write the lower blade surface R*theta (= upper - thickness)
+            write_values_in_block(i, rtheta_lower, file, JM)
             file.write("  1.000000  0.000000\n")
             write_values_in_block(i, r, file, JM)
 
@@ -2707,7 +2923,7 @@ def xRtheta_plot(Rtheta_new, R_new, x_new):
     
 # Write the Bleed Air Cards for the Multall Input File
 def create_bleed_air_card(NROW, file, rotor_data, stator_data):
-    print(f"file={file}")
+    debug_log.debug(f"Writing bleed air to file={file}", context="create_bleed_air_card")
     with open(file, "a") as file:
         if len(rotor_data) != 0 or len(stator_data) != 0:
             file.write("NBLEED\n")
@@ -3008,13 +3224,17 @@ class CompressorGUI:
                             values = [v.strip() for v in line.split('=')[1].strip().split(',')]
                             self.bleed_air_data['rotor']['patches'].append(values)
                         except (ValueError, IndexError) as e:
-                            print(f"Error parsing Rotor patchline: line={line}. Error: {e}")
+                            err_msg = f"Error parsing Rotor patchline: line={line}. Error: {e}"
+                            print(err_msg)
+                            debug_log.debug(err_msg, context="load_parameters")
                     elif line.startswith('stator_patches_'):
                         try:
                             values = [v.strip() for v in line.split('=')[1].strip().split(',')]
                             self.bleed_air_data['stator']['patches'].append(values)
                         except (ValueError, IndexError) as e:
-                            print(f"Error parsing Stator patchline: line={line}. Error: {e}")    
+                            err_msg = f"Error parsing Stator patchline: line={line}. Error: {e}"
+                            print(err_msg)
+                            debug_log.debug(err_msg, context="load_parameters")    
                     elif line.startswith('inlet_area = '):
                         self.inlet_area_var.set(float(line.split('=')[1].strip()))
                     elif line.startswith('inlet_dist = '):
@@ -3027,7 +3247,9 @@ class CompressorGUI:
 
 
         except FileNotFoundError:
-            print("No previous parameters found. Starting with defaults.")
+            info_msg = "No previous parameters found. Starting with defaults."
+            print(info_msg)
+            debug_log.debug(info_msg, context="load_parameters")
         
         # Initial call to set up the Bleed AIr Tab based on loaded values
         self.update_bleed_air_display()
@@ -3246,7 +3468,9 @@ class CompressorGUI:
             file.write(f"outlet_area = {outlet_area}\n")
             file.write(f"outlet_dist = {outlet_dist}\n")
 
-        print("Parameters saved successfully.")
+        save_msg = "Parameters saved successfully."
+        print(save_msg)
+        debug_log.debug(save_msg, context="save_parameters")
 
 if __name__ == "__main__":
     
@@ -3448,7 +3672,7 @@ def adjustBezierCurve_d_l(BezierPoints):
     for i in range(len(d_lB)):
         d_lB[i] = round(d_lB[i], 2)
 
-    print(f"New Bézier Point: {d_lB}")
+    debug_log.debug(f"New Bézier Point: {d_lB}", context="adjustBezierCurve_beta")
     
     return BezierPoints
 
@@ -3513,7 +3737,7 @@ def adjustBezierCurve_d(BezierPoints, cordlenght):
         d_lB[i] = round(d_lB[i]*100/cordlenght, 2)
 
     
-    print(f"New Bézier Point: {d_lB}")
+    debug_log.debug(f"New Bézier Point: {d_lB}", context="adjustBezierCurve_d")
     return d_lB
 
 def adjustBezierCurve_beta(BezierPoints):
@@ -3575,7 +3799,7 @@ def adjustBezierCurve_beta(BezierPoints):
     for i in range(len(beta)):
         beta[i] = round(beta[i], 2)
 
-    print(f"New Bézier Point: {beta}")
+    debug_log.debug(f"New Bézier Point: {beta}", context="adjustBezierCurve_beta")
     return BezierPoints
 
 

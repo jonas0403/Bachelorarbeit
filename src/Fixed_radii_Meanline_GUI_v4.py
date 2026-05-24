@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import os 
 import sys
 import atexit
+import debug_log
 from tkinter import ttk
 from tkinter import messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -318,7 +319,7 @@ class diameter_gui:
             self.cubspline_points = [1] * self.num_points
         
         self.t = np.arange(0, 1.01, 0.01)
-        print(f"self.cubspline_points={self.cubspline_points}")
+        debug_log.debug(f"self.cubspline_points={self.cubspline_points}", context="DiameterGUI")
         
         # Define x-cood for Bezier-Points
         self.mB = np.linspace(0.0, 1.0, self.num_points)
@@ -531,7 +532,7 @@ def run_diameter_gui(i_st):
     initial_data = read_diameter(SETTINGS_FILE)    
     diameter_gui(root, i_st, on_close, initial_data)
     root.mainloop()
-    print(f"D_f1={D_f1}, D_f2={D_f2}, D_f3={D_f3}, fixed_radius_type={fixed_radius_type}, plot_channel_contour={plot_channel_contour}")
+    debug_log.debug(f"D_f1={D_f1}, D_f2={D_f2}, D_f3={D_f3}, fixed_radius_type={fixed_radius_type}, plot_channel_contour={plot_channel_contour}", context="diameter_gui")
     return D_f1, D_f2, D_f3, fixed_radius_type, plot_channel_contour
               
     
@@ -566,7 +567,9 @@ def read_diameter(filename):
 def write_diameters(filename,fixed_radius_typ, D_f1, D_f2, D_f3, plot_channel_contour):
     # Check if there is a Lock File. Lock file is created to signal that the GUI and Diameters_values.txt was writen/modified 
     if os.path.exists(LOCK_FILE):
-        print("Lock File was found. Reading Diameters_Values.txt")
+        lock_msg = "Lock File was found. Reading Diameters_Values.txt"
+        print(lock_msg)
+        debug_log.debug(lock_msg, context="write_diameters")
         return
     # If no Lock File exists create one
     try:
@@ -574,17 +577,21 @@ def write_diameters(filename,fixed_radius_typ, D_f1, D_f2, D_f3, plot_channel_co
             f.write("running")
         # Registers a function to delete the Lock File if Programm is exited normally
 
-        print(f"D_f1={D_f1}, D_f2={D_f2}, D_f3={D_f3}, fixed_radius_type={fixed_radius_typ}, plot_channel_contour={plot_channel_contour}")
+        debug_log.debug(f"D_f1={D_f1}, D_f2={D_f2}, D_f3={D_f3}, fixed_radius_type={fixed_radius_typ}, plot_channel_contour={plot_channel_contour}", context="write_diameters")
         with open(filename, 'w') as file:
             file.write(f'Fixed Radius Typ = {fixed_radius_typ}\n')
             file.write(f'D_f1 = {D_f1}\n')
             file.write(f'D_f2 = {D_f2}\n')
             file.write(f'D_f3 = {D_f3}\n')
             file.write(f'Plot Channel Contour = {plot_channel_contour}')
-        print("Settings were written succesfully ")
+        settings_msg = "Settings were written successfully."
+        print(settings_msg)
+        debug_log.debug(settings_msg, context="write_diameters")
 
     except Exception as e:
-        print(f"Error dring writting of the Diameters_Values.txt: {e}")
+        write_err = f"Error writing Diameters_Values.txt: {e}"
+        print(write_err)
+        debug_log.debug(write_err, context="write_diameters")
         # Delete Lock File in case of an error
         if os.path.exists(LOCK_FILE):
             os.remove(LOCK_FILE)
@@ -685,9 +692,13 @@ def create_gui():
                 file.write(f"d_CL_S = {d_CL_S}\n")
                 file.write(f"incidence_S = {incidence_S}\n")
 
-            print("Parameters saved and initialized.")
+            params_msg = "Parameters saved and initialized."
+            print(params_msg)
+            debug_log.debug(params_msg, context="meanline_parameters")
         except ValueError:
-            print("Please enter valid numbers for all conditions. z_R and z_S must be integers.")
+            val_err = "Please enter valid numbers for all conditions. z_R and z_S must be integers."
+            print(val_err)
+            debug_log.debug(val_err, context="meanline_parameters")
 
     ttk.Button(root, text="Save and Initialize Parameters", command=save_and_initialize).pack(pady=10)
 
@@ -880,7 +891,9 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
             max_iteration_steps=1000
             tolerance=0.0005
 
-            print(f"\n--- Starting calculation for Stage {i+1}/{i_st} ---")
+            stage_msg = f"\n--- Starting calculation for Stage {i+1}/{i_st} ---"
+            print(stage_msg)
+            debug_log.debug(stage_msg, context="meanline")
 
             if fixed_radius_type == "hub":
                 D_H1[i]=D_f1[i]
@@ -1002,9 +1015,8 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
                 # Blade Angles, Reynoldsnumbers, Machnumbers and Losses
 
                 
-                # bugfixe
-                print(f"beta_blade_1[i]{beta_blade_1[i]}=angle_blade_in(beta_1[i]={beta_1[i]}, beta_2[i]={beta_2[i]}, w1[i]={w1[i]}, w2[i]={w2[i]}, T_1[i]={T_1[i]}, T_2[i]={T_2[i]}, l_R_t_R[i]={l_R_t_R[i]}, d_R_l_R[i]={d_R_l_R[i]}, incidence_R[i]={incidence_R[i]}, R={R}, kappa={kappa})")
-                
+                debug_log.debug(f"beta_blade_1[i]={beta_blade_1[i]}=angle_blade_in(...)", context="meanline")
+
                 Re_l_R[i]=Re(roh_1[i],w1[i],l_R[i],T_1[i])
                 beta_blade_1[i]=angle_blade_in(beta_1[i], beta_2[i], w1[i], w2[i], T_1[i], T_2[i], l_R_t_R[i], d_R_l_R[i], incidence_R[i], R, kappa)
                 beta_blade_2[i]=angle_blade_out(beta_1[i], beta_2[i], w1[i], w2[i], T_1[i], T_2[i], l_R_t_R[i], d_R_l_R[i], incidence_R[i], R, kappa)
@@ -1113,21 +1125,27 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
                     # print(f"Stage:{i+1}    under_sqrt3({under_sqrt3})=D_H3[i]({D_H3[i]})**2+(4*mflow({mflow}))/(Pi*roh_3[i]({roh_3[i]})*c_m3[i]({c_m3[i]}))")
 
                     if under_sqrt1 < 0:
-                        print(f"Warning: Term under sqrt for D_S1 at stage {i} is negative. Setting D_S1[i] = D_H1[i].")
+                        warn_msg = f"Warning: Term under sqrt for D_S1 at stage {i} is negative. Setting D_S1[i] = D_H1[i]."
+                        print(warn_msg)
+                        debug_log.debug(warn_msg, context="meanline")
                         D_S1[i]=D_H1[i]
                     else:
                         D_S1[i]=math.sqrt(under_sqrt1)
                     new_D_M1_guess=(D_H1[i]+D_S1[i])/2
 
                     if under_sqrt2 < 0:
-                        print(f"Warning: Term under sqrt for D_S2 at stage {i} is negative. Setting D_S2[i] = D_H2[i].")
+                        warn_msg = f"Warning: Term under sqrt for D_S2 at stage {i} is negative. Setting D_S2[i] = D_H2[i]."
+                        print(warn_msg)
+                        debug_log.debug(warn_msg, context="meanline")
                         D_S2[i]=D_H2[i]
                     else:
                         D_S2[i]=math.sqrt(under_sqrt2)
                     new_D_M2_guess=(D_H2[i]+D_S2[i])/2
 
                     if under_sqrt3 < 0:
-                        print(f"Warning: Term under sqrt for D_S3 at stage {i} is negative. Setting D_S3[i] = D_H3[i].")
+                        warn_msg = f"Warning: Term under sqrt for D_S3 at stage {i} is negative. Setting D_S3[i] = D_H3[i]."
+                        print(warn_msg)
+                        debug_log.debug(warn_msg, context="meanline")
                         D_S3[i]=D_H3[i]
                     else:
                         D_S3[i]=math.sqrt(under_sqrt3)
@@ -1156,21 +1174,27 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
                     under_sqrt3=D_S3[i]**2-(4*mflow)/(Pi*roh_3[i]*c_m3[i])
                     
                     if under_sqrt1 < 0:
-                        print(f"Warning: Term under sqrt for D_H1 at stage {i} is negative. Setting D_H1[i] = D_S1[i].")
+                        warn_msg = f"Warning: Term under sqrt for D_H1 at stage {i} is negative. Setting D_H1[i] = D_S1[i]."
+                        print(warn_msg)
+                        debug_log.debug(warn_msg, context="meanline")
                         D_H1[i]=D_S1[i]
                     else:
                         D_H1[i]=math.sqrt(under_sqrt1)
                     new_D_M1_guess=(D_H1[i]+D_S1[i])/2
 
                     if under_sqrt2 < 0:
-                        print(f"Warning: Term under sqrt for D_H2 at stage {i} is negative. Setting D_H2[i] = D_S2[i].")
+                        warn_msg = f"Warning: Term under sqrt for D_H2 at stage {i} is negative. Setting D_H2[i] = D_S2[i]."
+                        print(warn_msg)
+                        debug_log.debug(warn_msg, context="meanline")
                         D_H2[i]=D_S2[i]
                     else:
                         D_H2[i]=math.sqrt(under_sqrt2)
                     new_D_M2_guess=(D_H2[i]+D_S2[i])/2
 
                     if under_sqrt3 < 0:
-                        print(f"Warning: Term under sqrt for D_H3 at stage {i} is negative. Setting D_H3[i] = D_S3[i].")
+                        warn_msg = f"Warning: Term under sqrt for D_H3 at stage {i} is negative. Setting D_H3[i] = D_S3[i]."
+                        print(warn_msg)
+                        debug_log.debug(warn_msg, context="meanline")
                         D_H3[i]=D_S3[i]
                     else:
                         D_H3[i]=math.sqrt(under_sqrt3)
@@ -1252,18 +1276,16 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
 
                 # Debug-Prints useful for debugging
                 if iteration_count % 10 == 0 or converged: # Every 10 iterations or at convergence
-                    print(f"  Stage {i+1}, Iteration {iteration_count+1}: D_M1={current_D_M1_guess:.4f}, D_M2={current_D_M2_guess:.4f}, D_M3={current_D_M3_guess:.4f}")
-                    print(f"  Changes: dD_M1={abs(current_D_M1_guess - old_D_M1_guess):.6f}, dD_M2={abs(current_D_M2_guess - old_D_M2_guess):.6f}, dD_M3={abs(current_D_M3_guess - old_D_M3_guess):.6f} (Tol: {tolerance})")
-
-                    print(f" The Diameters for this stage are: D_S1 = {D_S1[i]:.4f}; D_M1 = {D_M1[i]:.4f}; D_H1 = {D_H1[i]:.4f}; D_S2 = {D_S2[i]:.4f}; D_M2 = {D_M2[i]:.4f}; D_H2 = {D_H2[i]:.4f}; D_S3 = {D_S3[i]:.4f}; D_M3 = {D_M3[i]:.4f}; D_H3 = {D_H3[i]:.4f}")
-                    
-                    print(f"  T_t1={T_t1[i]:.2f} K, p_t1={p_t1[i]:.2f} Pa, roh_1={roh_1[i]:.4f} kg/m^3")
-                    print(f"  Ma_w1={Ma_w1[i]:.3f}, Ma_c1={Ma_c1[i]:.3f}")
-                    print(f"  eta_s={eta_s[i]:.3f}, TPR={TPR[i]:.3f}")
+                    debug_log.debug(f"Stage {i+1}, Iteration {iteration_count+1}: D_M1={current_D_M1_guess:.4f}, D_M2={current_D_M2_guess:.4f}, D_M3={current_D_M3_guess:.4f}", context="meanline")
+                    debug_log.debug(f"Changes: dD_M1={abs(current_D_M1_guess - old_D_M1_guess):.6f}, dD_M2={abs(current_D_M2_guess - old_D_M2_guess):.6f}, dD_M3={abs(current_D_M3_guess - old_D_M3_guess):.6f} (Tol: {tolerance})", context="meanline")
+                    debug_log.debug(f"Diameters: D_S1={D_S1[i]:.4f} D_M1={D_M1[i]:.4f} D_H1={D_H1[i]:.4f}  D_S2={D_S2[i]:.4f} D_M2={D_M2[i]:.4f} D_H2={D_H2[i]:.4f}  D_S3={D_S3[i]:.4f} D_M3={D_M3[i]:.4f} D_H3={D_H3[i]:.4f}", context="meanline")
+                    debug_log.debug(f"T_t1={T_t1[i]:.2f}K p_t1={p_t1[i]:.2f}Pa roh_1={roh_1[i]:.4f}  Ma_w1={Ma_w1[i]:.3f} Ma_c1={Ma_c1[i]:.3f}  eta_s={eta_s[i]:.3f} TPR={TPR[i]:.3f}", context="meanline")
 
 
                 if converged:
-                    print(f"Stage {i+1}: Converged in {iteration_count+1} iterations.")
+                    conv_msg = f"Stage {i+1}: Converged in {iteration_count+1} iterations."
+                    print(conv_msg)
+                    debug_log.debug(conv_msg, context="meanline")
                     if fixed_radius_type == "hub" and i < i_st:
                         current_D_M1_guess = current_D_M3_guess
                     elif fixed_radius_type == "shroud" and i < i_st:
@@ -1280,7 +1302,9 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
                 
 
             else: # This 'else' block executes if the while loop completes WITHOUT a 'break'
-                print(f"Warning: Diameters for stage {i} did not converge after {max_iteration_steps} iterations.") 
+                nonconv_msg = f"Warning: Diameters for stage {i} did not converge after {max_iteration_steps} iterations."
+                print(nonconv_msg)
+                debug_log.debug(nonconv_msg, context="meanline")
                 # The last calculated values are stored in D_M1[i], D_S1[i] etc.
 
 
@@ -1303,9 +1327,9 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
         # Overall Mashine Performance
         TPR_M=p_t3[i_st-1]/p_t1[0]# TPR over all stages
         TPR_history.append(TPR_M)
-        print(f"TPR_M={TPR_history}")
-        print(f"iter count = {iter_count_TPR}")
-        print(f"length TPR_history 1 = {len(TPR_history)}")
+        debug_log.debug(f"TPR_M={TPR_history}", context="meanline_TPR")
+        debug_log.debug(f"iter count = {iter_count_TPR}", context="meanline_TPR")
+        debug_log.debug(f"length TPR_history 1 = {len(TPR_history)}", context="meanline_TPR")
 
         
         # Initialize both secant values
@@ -1338,8 +1362,10 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
             if abs(curr_TPR - old_TPR) > 1e-6: # Prevent Division by Zero
                 next_n = curr_n - (curr_TPR - design_TPR) * (curr_n - old_n) / ((curr_TPR-design_TPR) - (old_TPR-design_TPR))
             else:
-                # Fallback Stratagie in case of no or very small TPR changes but not near the Design TPR
-                print("Warning: No siginificant TPR changes. Apllying a small linear ddjustment")
+                # Fallback strategy in case of no or very small TPR changes but not near the Design TPR
+                tpr_warn = "Warning: No significant TPR changes. Applying a small linear adjustment."
+                print(tpr_warn)
+                debug_log.debug(tpr_warn, context="meanline_TPR")
                 if curr_TPR < design_TPR:
                     next_n = curr_n * 1.02
                 else:
@@ -1371,11 +1397,15 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
             
 
         if abs(TPR_M - design_TPR) < conv_limit_TPR:
-            print(f"\n Total Pressure Ratio has converged after {iter_count_TPR} Iterations. The TPR is = {TPR_M:.3f} at an RPM of {n} and a Massflow of {mflow}")
+            tpr_done = f"\nTotal Pressure Ratio has converged after {iter_count_TPR} iterations. TPR = {TPR_M:.3f} at RPM = {n[0]:.0f}, massflow = {mflow}"
+            print(tpr_done)
+            debug_log.debug(tpr_done, context="meanline_TPR")
             n = [curr_n] * i_st
             break
     else: # This 'else' block executes if the while loop completes WITHOUT a 'break'
-        print(f"Warning: Total Pressure Ratio did not converge after {max_iter_steps_TPR} iterations.") 
+        tpr_fail = f"Warning: Total Pressure Ratio did not converge after {max_iter_steps_TPR} iterations."
+        print(tpr_fail)
+        debug_log.debug(tpr_fail, context="meanline_TPR")
 
 
     
@@ -1430,6 +1460,7 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
             b2[i]=mflow/(roh_2[i]*phi_2[i]*u2[i]*Pi*D_M2[i])*1000
             b3[i]=mflow/(roh_3[i]*phi_3[i]*u2[i]*Pi*D_M3[i])*1000
     
+    for i in range(i_st):
         nue_in.append(D_H1[i]/D_S1[i])
         delta_D_target_12.append(D_S1[i]-D_S2[i])
         delta_D_target_23.append(D_S2[i]-D_S3[i])
@@ -1456,15 +1487,14 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
         
         
     if plot_channel_contour == True:
-        print("plot incoming")
+        debug_log.debug("plot incoming", context="meanline")
         plot_channel(D_S1, D_S2, D_S3, D_H1, D_H2, D_H3, D_M1, D_M2, D_M3, i_st, l_R, l_S, beta_blade_1, beta_blade_2, alpha_blade_2, alpha_blade_3)
         
     
     for i in range(i_st):
-        # BUGFIX
-        print(f"Stg:{i} D_S3={D_S3[i]} D_M3={D_M3[i]} D_H3={D_H3[i]} ")
+        debug_log.debug(f"Stg:{i} D_S3={D_S3[i]} D_M3={D_M3[i]} D_H3={D_H3[i]}", context="meanline")
         if i < i_st:
-            print(f"Stg:{i+1} D_S1={D_S1[i]} D_M1={D_M1[i]} D_H1={D_H1[i]} ")
+            debug_log.debug(f"Stg:{i+1} D_S1={D_S1[i]} D_M1={D_M1[i]} D_H1={D_H1[i]}", context="meanline")
 
 
     '''

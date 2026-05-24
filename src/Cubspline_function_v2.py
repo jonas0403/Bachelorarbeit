@@ -3,6 +3,8 @@
 # Cubspline function
 # funcions for spline calculation
 
+import debug_log
+
 def spline(x, y, N, yp1, ypn, y2):
     
     """ 
@@ -73,7 +75,9 @@ def splint(xa, ya, y2a, N, x):
     # klo and khi now bracket the input value of x.
     h = xa[khi] - xa[klo]
     if (h == 0):
-        print("bad xa input in splint")
+        spline_err = "bad xa input in splint"
+        print(spline_err)
+        debug_log.debug(spline_err, context="splint")
 
     # Cubic spline polynomial is now evaluated.
     A = (xa[khi] - x) / h

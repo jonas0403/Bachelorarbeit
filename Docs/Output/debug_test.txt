@@ -1,0 +1,5 @@
+Debug log opened: Docs/Output/debug_test.txt
+Session started: 2026-05-22 18:13:07
+
+[2026-05-22 18:13:07.884] === Test: Channel unit consistency ===
+[2026-05-22 18:13:08.744] [channel] l_R=65.0

@@ -130,7 +130,9 @@ class CompressorGui:
                  
                 self.prepop_thermo_data = new_thermo_values
                     
-                print("Thermodynamic Parameters saved and initialized.")
+                thermo_msg = "Thermodynamic Parameters saved and initialized."
+                print(thermo_msg)
+                debug_log.debug(thermo_msg, context="zeroD_tab")
 
                 
                 self.Thermodata =  Thermo(
@@ -142,9 +144,13 @@ class CompressorGui:
                     new_thermo_values['TPR'],
                     self.stage
                 )
-                print("Calculation of Thermodynamic Data completed.") 
+                calc_msg = "Calculation of Thermodynamic Data completed."
+                print(calc_msg)
+                debug_log.debug(calc_msg, context="zeroD_tab")
             except ValueError:
-                print("Please enter valid numbers for all conditions.")
+                val_err = "Please enter valid numbers for all conditions."
+                print(val_err)
+                debug_log.debug(val_err, context="zeroD_tab")
                 
             
             
@@ -388,7 +394,7 @@ class CompressorGui:
             
             root.wait_window()
             
-            print("Does this get called")
+            debug_log.debug("diameter_gui close callback called", context="oneD_tab")
             write_diameters(self, fixed_radius_type, D_f1_result, D_f2_result, D_f3_result, plot_channel_contour)
             return fixed_radius_type, D_f1_result, D_f2_result, D_f3_result, plot_channel_contour
 
@@ -432,7 +438,7 @@ class CompressorGui:
         class diameter_gui:
             def __init__(self, root, i_st_val, on_close_callback, initial_diamter_data):
                 
-                print("initial_data:", initial_diamter_data)
+                debug_log.debug(f"initial_data: {initial_diamter_data}", context="diameter_gui")
                 
                 self.root = root
                 self.on_close_callback = on_close_callback
@@ -453,7 +459,7 @@ class CompressorGui:
                 self.initial_D_f2 = initial_diamter_data.get("D_f2", [])
                 self.initial_D_f3 = initial_diamter_data.get("D_f3", [])
                 self.initial_plot_contour = initial_diamter_data.get("plot_channel_contour", False)
-                print(f"plot_channel_contour={self.initial_plot_contour}")
+                debug_log.debug(f"plot_channel_contour={self.initial_plot_contour}", context="diameter_gui")
                 
                 # Initialize this data
                 self.cubspline_points = []
@@ -470,7 +476,7 @@ class CompressorGui:
                     self.cubspline_points = [1] * self.num_points
                 
                 self.t = np.arange(0, 1.01, 0.01)
-                print(f"self.cubspline_points={self.cubspline_points}")
+                debug_log.debug(f"self.cubspline_points={self.cubspline_points}", context="diameter_gui")
                 
                 # Define x-cood for Bezier-Points
                 self.mB = np.linspace(0.0, 1.0, self.num_points)
@@ -670,7 +676,7 @@ class CompressorGui:
                     "fixed_radius_type": fixed_radius_type,
                     "plot_channel_contour": plot_channel_contour
                 }
-                print(f"self.changed_channel_contour_data: {self.changed_channel_contour_data}")
+                debug_log.debug(f"self.changed_channel_contour_data: {self.changed_channel_contour_data}", context="diameter_gui")
                 
                 #self.save_and_initialize_meanline(plot_channel_contour) 
                 self.on_close_callback(self.changed_channel_contour_data)
@@ -714,7 +720,7 @@ class CompressorGui:
                     new_diameter_data["D_f2"] = D_f2
                     new_diameter_data["D_f3"] = D_f3
                     
-                    print(f"Debug plot_chanel_contour: {plot_channel_contour}")
+                    debug_log.debug(f"Debug plot_chanel_contour: {plot_channel_contour}", context="diameter_gui")
                         
                     new_diameter_data["fixed_radius_type"] = fixed_radius_type
                     new_diameter_data["plot_channel_contour"] = plot_channel_contour
@@ -727,13 +733,17 @@ class CompressorGui:
 
                     with open(json_path, 'w') as file:
                         json.dump(all_json_data, file, indent=4)
-                    print("Diameter data saved to JSON successfully.")
+                    status_msg = "Diameter data saved to JSON successfully."
+                    print(status_msg)
+                    debug_log.debug(status_msg, context="diameter_gui")
                     
                     self.prepop_diameter_data = new_diameter_data
-                    print(f"D_f1={D_f1}, D_f2={D_f2}, D_f3={D_f3}, fixed_radius_type = {fixed_radius_type}, plot_channel_contour = {plot_channel_contour}")
+                    debug_log.debug(f"D_f1={D_f1}, D_f2={D_f2}, D_f3={D_f3}, fixed_radius_type = {fixed_radius_type}, plot_channel_contour = {plot_channel_contour}", context="diameter_gui")
                     self.meanline_data = meanline(self.Thermodata, self.prepop_meanline_input_data, self.prepop_diameter_data, plot_channel_contour)
                 except Exception as e:
-                    print(f"Error during JSON write in write_diameters: {e}")
+                    err_msg = f"Error during JSON write in write_diameters: {e}"
+                    print(err_msg)
+                    debug_log.debug(err_msg, context="diameter_gui")
                 
                 
                 
@@ -741,7 +751,7 @@ class CompressorGui:
             # Read Initial Data from File   
             diameter_gui(root, i_st, on_close, initial_data)
             root.mainloop()
-            print(f"D_f1={D_f1}, D_f2={D_f2}, D_f3={D_f3}, fixed_radius_type={fixed_radius_type}, plot_channel_contour={plot_channel_contour}")
+            debug_log.debug(f"D_f1={D_f1}, D_f2={D_f2}, D_f3={D_f3}, fixed_radius_type={fixed_radius_type}, plot_channel_contour={plot_channel_contour}", context="diameter_gui")
             
             self.prepop_diameter_data["D_f1"] = D_f1
             self.prepop_diameter_data["D_f2"] = D_f2
@@ -749,10 +759,10 @@ class CompressorGui:
             self.prepop_diameter_data["fixed_radius_type"] = fixed_radius_type  
             self.prepop_diameter_data["plot_channel_contour"] = plot_channel_contour
             
-            print(f"UPDATED prepop_diameter_data: {self.prepop_diameter_data}")
+            debug_log.debug(f"UPDATED prepop_diameter_data: {self.prepop_diameter_data}", context="diameter_gui")
             
             if save_callback:
-                print("Calling save_callback...")  # Debug
+                debug_log.debug("Calling save_callback...", context="diameter_gui")
                 save_callback()#save_callback(show_plot=plot_channel_contour)
             
             return D_f1, D_f2, D_f3, fixed_radius_type, plot_channel_contour
@@ -760,8 +770,8 @@ class CompressorGui:
         
 
         def write_diameters():
-            print("Writing using the write_diameters function")
-            print("Writing diameter data to JSON...")
+            debug_log.debug("Writing using the write_diameters function", context="diameter_gui")
+            debug_log.debug("Writing diameter data to JSON...", context="diameter_gui")
             plot_channel_contour=False
             self.meanline_data = meanline(self.Thermodata, self.prepop_meanline_input_data, self.prepop_diameter_data, plot_channel_contour)
             '''
@@ -804,16 +814,24 @@ class CompressorGui:
 
                 with open(json_path, 'w') as file:
                     json.dump(all_json_data, file, indent=4)
-                print("Diameter data saved to JSON successfully.")
+                status_msg = "Diameter data saved to JSON successfully."
+                print(status_msg)
+                debug_log.debug(status_msg, context="diameter_gui")
             except Exception as e:
-                print(f"Error during JSON write in write_diameters: {e}")
+                err_msg = f"Error during JSON write in write_diameters: {e}"
+                print(err_msg)
+                debug_log.debug(err_msg, context="diameter_gui")
                 
                 self.prepop_diameter_data = new_diameter_data
                 
-                print("Parameters saved and initialized.")
+                status_msg = "Parameters saved and initialized."
+                print(status_msg)
+                debug_log.debug(status_msg, context="oneD_tab")
             
             except ValueError as e: 
-                print(f"Error: {e}")  
+                err_msg = f"Error: {e}"
+                print(err_msg)
+                debug_log.debug(err_msg, context="oneD_tab")  
 
         def create_gui():
             
@@ -866,7 +884,7 @@ class CompressorGui:
                         entries[param].append(entry)
                     '''
             def save_and_initialize_meanline(show_plot):
-                print(f"Writing using the save_and_initialize function. Show_plot = {show_plot}")
+                debug_log.debug(f"Writing using the save_and_initialize function. Show_plot = {show_plot}", context="oneD_tab")
                 
                 ''' 
                 Run meanline function to calculate channelcontour   
@@ -1003,9 +1021,13 @@ class CompressorGui:
                     
                     self.prepop_meanline_input_data = new_meanline_input_data
                         
-                    print("Meanline Parameters saved and initialized.")
+                    status_msg = "Meanline Parameters saved and initialized."
+                    print(status_msg)
+                    debug_log.debug(status_msg, context="oneD_tab")
                 except ValueError:
-                    print("Please enter valid numbers for all conditions. z_R and z_S must be integers.")
+                    err_msg = "Please enter valid numbers for all conditions. z_R and z_S must be integers."
+                    print(err_msg)
+                    debug_log.debug(err_msg, context="oneD_tab")
                 
                 '''
                 # Not old used in wrong spot???
@@ -1034,7 +1056,7 @@ class CompressorGui:
                     print("Please enter valid numbers for all conditions. z_R and z_S must be integers.")
                 '''
 
-            print(f"self.prepop_diameter_data: {self.prepop_diameter_data}")
+            debug_log.debug(f"self.prepop_diameter_data: {self.prepop_diameter_data}", context="oneD_tab")
             ttk.Button(root, text="Save and Initialize Parameters", command=lambda: save_and_initialize_meanline(show_plot=self.prepop_diameter_data["plot_channel_contour"])).pack(pady=10)
             #ttk.Button(root, text="Save and Initialize Parameters", command=save_and_initialize(show_plot=self.prepop_diameter_data["Plot Channel Contour"])).pack(pady=10)
             ttk.Button(root, text="Change the Channelcontour", command=lambda: run_diameter_gui(i_st_val, self.prepop_diameter_data, write_diameters)).pack(pady=10)
@@ -1147,7 +1169,7 @@ class CompressorGui:
 
     def load_bleed_air_and_area_change(self):
         # Load settings from JSON
-        print("Loading settings from json bleed air and co gets called")
+        debug_log.debug("Loading settings from json bleed air and co gets called", context="threeD_tab")
         
         try:
             with open(json_path, 'r') as file:
@@ -1265,7 +1287,7 @@ class CompressorGui:
                     patch_key = f'stator_patch_{i+1}'
                     if patch_key in bleed_data:
                         self.bleed_air_data['stator']['patches'].append(bleed_data[patch_key])
-            print(f"self.bleed_air_data: {self.bleed_air_data}")
+            debug_log.debug(f"self.bleed_air_data: {self.bleed_air_data}", context="threeD_tab")
             
             # Load Intake_Outtake_area
             if 'Intake_Outtake_area' in all_json_data:
@@ -1289,14 +1311,22 @@ class CompressorGui:
             self.prepop_bleed_air_data = all_json_data.get('Bleed_air_data', {})
             self.prepop_intake_outtake = all_json_data.get('Intake_Outtake_area', {})
             
-            print("Settings loaded successfully from JSON.")
-            print(f"")
+            status_msg = "Settings loaded successfully from JSON."
+            print(status_msg)
+            debug_log.debug(status_msg, context="load_settings")
+            debug_log.debug("", context="load_settings")
         except FileNotFoundError:
-            print("No previous parameters found. Starting with defaults.")
+            status_msg = "No previous parameters found. Starting with defaults."
+            print(status_msg)
+            debug_log.debug(status_msg, context="load_settings")
         except json.JSONDecodeError as e:
-            print(f"Error parsing JSON file: {e}")
+            err_msg = f"Error parsing JSON file: {e}"
+            print(err_msg)
+            debug_log.debug(err_msg, context="load_settings")
         except Exception as e:
-            print(f"Error loading settings: {e}")
+            err_msg = f"Error loading settings: {e}"
+            print(err_msg)
+            debug_log.debug(err_msg, context="load_settings")
 
         
     def setup_inlet_outlet_tab(self):
@@ -1352,7 +1382,7 @@ class CompressorGui:
         self.outlet_area_help_text = "Enter the Size of the Outlet as a factor of the Diameter of the last Blade Row. Default = 1 (same Size as the Diameter of the last Blade Row)"
         Tooltip(self.outlet_area_help, self.outlet_area_help_text)
         
-        print(f"self.outlet_area_var: {self.outlet_area_var.get()}")
+        debug_log.debug(f"self.outlet_area_var: {self.outlet_area_var.get()}", context="threeD_tab")
         self.outlet_area_entry = ttk.Entry(self.outlet_frame, width=10, textvariable=self.outlet_area_var)
         self.outlet_area_entry.grid(row=0, column=1, padx=5, pady=5)
         
@@ -1563,7 +1593,7 @@ class CompressorGui:
             patch_entries.extend([stage_var, i_start_entry, i_end_entry, j_start_entry, j_end_entry, k_start_entry, k_end_entry, massflow_entry])
             
             
-            print(f"patch_entries: {patch_entries}")
+            debug_log.debug(f"patch_entries: {patch_entries}", context="threeD_tab")
             # Insert loaded values if exisiting
             if i < len(patches_data):
                 saved_patch = patches_data[i]
@@ -1611,9 +1641,9 @@ class CompressorGui:
         self.create_profiles_button = ttk.Button(choice_frame, text="Create Default Profile(s)", command=self.create_profiles_and_update_gui) # Button zum Erstellen der Profile
         self.create_profiles_button.pack(pady=5, padx=10, fill='x')
         
-        self.load_rotor_button = ttk.Button(choice_frame, text="Load Rotor Profile", command=lambda: self.import_bezier_from_txt('rotor')) # Auswahl für Profil Laden
+        self.load_rotor_button = ttk.Button(choice_frame, text="Load Rotor Profile", command=lambda: self.import_bezier_from_txt('rotor')) # Selection for loading profile
         self.load_rotor_button.pack(fill='x', padx=10, pady=5)
-        self.load_stator_button = ttk.Button(choice_frame, text="Load Stator Profile", command=lambda: self.import_bezier_from_txt('stator')) # Auswahl für Profil Laden
+        self.load_stator_button = ttk.Button(choice_frame, text="Load Stator Profile", command=lambda: self.import_bezier_from_txt('stator')) # Selection for loading profile
         self.load_stator_button.pack(fill='x', padx=10, pady=5)
         
         ttk.Button(choice_frame, text="Export Profiles to TXT", command=self.export_bezier_to_txt).pack(fill='x', padx=10, pady=5)
@@ -1638,12 +1668,16 @@ class CompressorGui:
                 with open(json_path, 'w') as file:
                     json.dump(all_json_data, file, indent=4)
                     
-                print("Adjust settings successfully saved to JSON.")
+                status_msg = "Adjust settings successfully saved to JSON."
+                print(status_msg)
+                debug_log.debug(status_msg, context="threeD_tab")
                 
                 self.prepop_adjust_data = new_adjust_values
                 
             except Exception as e:
-                print(f"Error saving adjust settings to JSON: {e}")
+                err_msg = f"Error saving adjust settings to JSON: {e}"
+                print(err_msg)
+                debug_log.debug(err_msg, context="threeD_tab")
                 
     
     def export_bezier_to_txt(self):
@@ -1851,12 +1885,12 @@ class CompressorGui:
         spec_window = tk.Toplevel(self.root)
         spec_window.title("Adjustments")
         spec_window.transient(self.root) # Fenster bleibt im Vordergrund
-        spec_window.grab_set() # Lässt keine Änderungen am Unterfenster zu
+        spec_window.grab_set() # Prevents changes to the sub-window
     
         frame = ttk.Frame(spec_window, padding="15")
         frame.pack(expand=True, fill="both")
     
-        # Erstellt ein DropDown Menü 
+        # Creates a dropdown menu 
         ttk.Label(frame, text="Section Plan to change:").grid(row=0, column=0, sticky='w', pady=5)
         
         section_combo = ttk.Combobox(frame, textvariable=self.specs["section_idx"], values=['0.0', '0.2', '0.5', '0.8', '1.0'], state="readonly")
@@ -1880,7 +1914,7 @@ class CompressorGui:
         path = filedialog.askdirectory()
         if path:  
             # Glaube das sollte nicht klappen weil du hast dein outputfolder anders genannt in deiner gui als in der originalen GUI          
-            self.output_folder_entry.delete(0, tk.END) # Löscht alte Inhalte
+            self.output_folder_entry.delete(0, tk.END) # Deletes old contents
             self.output_folder_entry.insert(0, path) # Neuer Pfad
 
     def load_rotor_settings(self):
@@ -1890,13 +1924,17 @@ class CompressorGui:
             
             try:
                 if os.path.samefile(filepath, "bezier_control_points_R.txt"):
-                    print("Diese Datei existiert bereits")
+                    msg = "This file already exists."
+                    print(msg)
+                    debug_log.debug(msg, context="threeD_tab")
                     return
             except FileNotFoundError:
                 pass
             
-            shutil.copy(filepath, "bezier_control_points_R.txt") # Kopiert die ausgewählte Datei in das Arbeitsverzeichnis 
-            print(f"Rotor Profile loaded: {filepath}")
+            shutil.copy(filepath, "bezier_control_points_R.txt")
+            msg = f"Rotor Profile loaded: {filepath}"
+            print(msg)
+            debug_log.debug(msg, context="threeD_tab")
 
         
     def load_stator_settings(self):
@@ -1905,13 +1943,17 @@ class CompressorGui:
                         
             try:
                 if os.path.samefile(filepath, "bezier_control_points_S.txt"):
-                    print("Diese Datei existiert bereits")
+                    msg = "This file already exists."
+                    print(msg)
+                    debug_log.debug(msg, context="threeD_tab")
                     return
             except FileNotFoundError:
                 pass
             
             shutil.copy(filepath, "bezier_control_points_S.txt")
-            print(f"Stator Profile loaded: {filepath}")
+            msg = f"Stator Profile loaded: {filepath}"
+            print(msg)
+            debug_log.debug(msg, context="threeD_tab")
 
     '''
     # not in use anymore
@@ -2079,18 +2121,24 @@ class CompressorGui:
             self.prepop_bleed_air_data = new_bleed_air_data
             self.prepop_intake_outtake = new_intake_outtake
             
-            print("3D-Parameters saved and initialized.")
+            status_msg = "3D-Parameters saved and initialized."
+            print(status_msg)
+            debug_log.debug(status_msg, context="threeD_tab")
             
         except ValueError as e:
-            print(f"Error: Please enter valid numbers. {e}")
+            err_msg = f"Error: Please enter valid numbers. {e}"
+            print(err_msg)
+            debug_log.debug(err_msg, context="threeD_tab")
         except Exception as e:
-            print(f"Error saving settings: {e}")
+            err_msg = f"Error saving settings: {e}"
+            print(err_msg)
+            debug_log.debug(err_msg, context="threeD_tab")
         
     def save_settings(self):
         with open('Settings.txt', 'w') as file:
             file.write(f"main_choice = {self.main_choice.get()}\n") # Holt sich die User Auswahl aus dem Radiobutton
         
-            if self.main_choice.get() == 'adjust': # nur wenn Adjust gewählt wurde
+            if self.main_choice.get() == 'adjust': # only if Adjust was selected
                 section_str = self.specs["section_idx"].get().split(" ")[0] 
                 section_map = {'0.0': 0, '0.2': 1, '0.5': 2, '0.8': 3, '1.0': 4}
                 file.write(f"adjust_section_idx = {section_map.get(section_str, 2)}\n")
@@ -2099,6 +2147,7 @@ class CompressorGui:
             
             file.write(f"levels = {self.levels_entry.get()}\n")
         print("Settings saved")
+        debug_log.debug("Settings saved", context="save_settings")
     
     # def load_settings(self):
     #     try:
@@ -2122,9 +2171,9 @@ class CompressorGui:
     #     except FileNotFoundError:
     #         self.levels_entry.insert(0, '0.0, 0.05, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 0.9, 0.95, 1.00')
     #         self.nrow_combo.set("Complete Stage (Rotor & Stator)")
-### Bis hier muss noch durch Lade Methode ersetzt werden. Hier nur aus Funktionsgründen kopiert
+### Everything above still needs to be replaced by a load method. Copied here only for functionality
 
-    # def run_action_and_stay_open(self): # Speichert alles und schließt das Fesnter nicht
+    # def run_action_and_stay_open(self): # Saves everything and does not close the window
     #     settings = {
     #         "main_choice": self.main_choice.get(),
     #     }
@@ -2445,18 +2494,18 @@ class CompressorGui:
         
         grid_data = { # Lade die Standartwerte
             'nrow': tk.IntVar(value=2),
-            'im_selection' : tk.StringVar(value=37),   # Default-Wert für IM
-            'km_selection' : tk.StringVar(value=37),   # Default-Wert für KM
-            'ref_chord_length': tk.DoubleVar(value=134.4),  # Default-Wert für Referenz-Sehnenlänge
-            'JM_grid_density': tk.IntVar(value=200),  # Default-Wert für Referenz-Gitterpunkte
+            'im_selection' : tk.StringVar(value=37),   # Default value for IM
+            'km_selection' : tk.StringVar(value=37),   # Default value for KM
+            'ref_chord_length': tk.DoubleVar(value=134.4),  # Default value for reference chord length
+            'JM_grid_density': tk.IntVar(value=200),  # Default value for reference grid points
             'tip_clearance_rotor': tk.DoubleVar(value=1.3),  # Standardwert von 1.3mm
             'inlet_percentage': tk.DoubleVar(value=0.2),  # Standardwert von 20%
             'outlet_percentage': tk.DoubleVar(value=0.15),  # Standardwert von 15%
-            'output_folder': tk.StringVar(value=''),  # Standardwert für den Ausgabe
-            'show_plot': tk.BooleanVar(value=False),  # Standardwert für die Anzeige des Plots
-            'Q3D_mode': tk.BooleanVar(value=False),  # Standardwert für Q3D Modus
-            'ref_chord_length_mode': tk.BooleanVar(value=False),  # Standardwert für die Referenz-Sehnenlänge
-            'SA_mode': tk.BooleanVar(value=False)  # Standardwert für die SA Turbulence Model
+            'output_folder': tk.StringVar(value='Run_Multall'),  # Default value for output
+            'show_plot': tk.BooleanVar(value=False),  # Default value for showing the plot
+            'Q3D_mode': tk.BooleanVar(value=False),  # Default value for Q3D mode
+            'ref_chord_length_mode': tk.BooleanVar(value=False),  # Default value for reference chord length mode
+            'SA_mode': tk.BooleanVar(value=False)  # Default value for SA turbulence model
         }
         
         km_options = ["5", "21", "25", "29", "33", "37", "41", "45", "49", "53", "57", "61", "65", "69", "73", "77", "81", "89"]
@@ -2584,7 +2633,7 @@ class CompressorGui:
         ttk.Label(inner_nrow_frame, text="Output:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.output_entry = ttk.Entry(inner_nrow_frame)
 
-        loaded_output = self.prepop_metadata.get('output_folder')
+        loaded_output = self.prepop_metadata.get('output_folder', '')
         self.output_entry.insert(0, loaded_output)
         
         self.output_entry.grid(row=2, column=1, columnspan=2, sticky="ew", padx=5, pady=5)
@@ -2639,11 +2688,11 @@ class CompressorGui:
                 SA_mode = False #  Standart Turbulence Model
                 SA_model =0
             
-            print(SA_model)
+            debug_log.debug(f"SA_model: {SA_model}", context="grid_tab")
             
         def save_and_initialize_grid():
 
-            print("Saving Parameter...")
+            debug_log.debug("Saving Parameter...", context="grid_tab")
             grid_data_save = {}
             
             for key, tk_variable in grid_data.items():
@@ -2676,24 +2725,28 @@ class CompressorGui:
                 with open(json_path, 'w') as file:
                     json.dump(all_json_data, file, indent=4)
                     
-                print("Parameters saved successfully to JSON.")
+                status_msg = "Parameters saved successfully to JSON."
+                print(status_msg)
+                debug_log.debug(status_msg, context="grid_tab")
 
                 self.prepop_grid_data = grid_data_save
                 
                 if not hasattr(self, 'prepop_metadata'):
                     self.prepop_metadata = {}
                 self.prepop_metadata['levels'] = levels_list
-                self.prepop_metadata['output_name'] = output_value
+                self.prepop_metadata['output_folder'] = output_value
                 
             except ValueError:
                 from tkinter import messagebox
                 messagebox.showerror("Eingabefehler", "Bitte überprüfe die Eingabe bei 'Levels'. Die Zahlen müssen mit Komma getrennt sein (z.B. 0.0, 0.5, 1.0).")
             except Exception as e:
-                print(f"Ein Fehler ist beim Speichern aufgetreten: {e}")
+                err_msg = f"An error occurred while saving: {e}"
+                print(err_msg)
+                debug_log.debug(err_msg, context="grid_tab")
         
         def generate_grid():
             
-            print("Saving Grid...")
+            debug_log.debug("Saving Grid...", context="grid_tab")
             save_and_initialize_grid()
             # current_grid_settings = {}
             # for key, widget in self.widgets.items():
@@ -2788,21 +2841,25 @@ class CompressorGui:
               merged version
             # ============================================================
             '''
-            print("Grid is saved.")
-            debug_log.open_file(os.path.join(os.path.dirname(json_path), "..", "outputFiles", "debug.txt"))
-            # Warum gibts das zwei mal für den selben knopf?
+            debug_log.debug("Grid is saved.", context="grid_tab")
+            debug_log.open_file(os.path.join(os.path.dirname(__file__), "..", "Docs", "Output", "debug.txt"))
+            # Why is this called twice for the same button?
             try:
                 run_main_logic({'main_choice': 'default'}, self, json_path)
             except Exception as e:
                 import traceback
-                print("\n--- Error Loading the 1-D Data ---")
+                err_msg = "\n--- Error Loading the 1-D Data ---"
+                print(err_msg)
+                debug_log.debug(err_msg, context="grid_tab")
                 traceback.print_exc()
                 messagebox.showerror("Error", "Please calculate and save the Meanline data first!")
                 return
             
-            print("Generating Grid...")
+            debug_log.debug("Generating Grid...", context="grid_tab")
             VG.process_grid_data(json_path, self)
-            print("Grid is generated.")
+            status_msg = "Grid is generated."
+            print(status_msg)
+            debug_log.debug(status_msg, context="grid_tab")
             
         
         '''
@@ -2875,7 +2932,9 @@ class CompressorGui:
         tk.Label(popup_multall, text="Do you want to start Multall with the current settings?", wraplength=280).pack(pady=20)
         
         def start_multall_and_exit():
-            print("Starting Multall...")
+            status_msg = "Starting Multall..."
+            print(status_msg)
+            debug_log.debug(status_msg, context="multall")
             
             current_dir = os.path.dirname(os.path.abspath(__file__))
             script_path = os.path.join(current_dir, "run_multall.py")
@@ -2887,7 +2946,9 @@ class CompressorGui:
             sys.exit()
         
         def cancel_and_exit():
-            print("Multall start cancelled.")
+            status_msg = "Multall start cancelled."
+            print(status_msg)
+            debug_log.debug(status_msg, context="multall")
             popup_multall.destroy()
             self.root.destroy()
             sys.exit()
@@ -2960,7 +3021,7 @@ class CompressorGui:
 
         self.root.protocol("WM_DELETE_WINDOW", self.start_Multall)
                     
-        # Fügt Tab listen ein
+        # Insert tab list
         notebook = ttk.Notebook(main_frame)  
         notebook.pack(fill='both', expand=True, padx=10, pady=10)
                     

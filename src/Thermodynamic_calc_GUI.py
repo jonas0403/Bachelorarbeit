@@ -7,6 +7,7 @@ import math
 import tkinter as tk
 import os
 import sys
+import debug_log
 
 from tkinter import ttk
 from pathlib import Path
@@ -62,7 +63,7 @@ def create_gui():
     params = ['p_t_in', 'T_t_in', 'mflow', 'R', 'cp', 'TPR']
     gui_names = ['p_t_in [Pa]', 'T_t_in [K]', 'mflow [kg/s]', 'R [J/kg*K]', 'cp [J/kg*K]', 'TPR [-]']
     path = os.getcwd()
-    print(path)
+    debug_log.debug(f"cwd={path}", context="Thermodynamic_calc_GUI")
     for i, param in enumerate(params):
         ttk.Label(frame, text=f"{gui_names[i]}:").grid(row=i, column=0, padx=5, pady=5, sticky='w')
         entries[param] = []
@@ -84,9 +85,13 @@ def create_gui():
                 file.write(f"cp = {cp}\n")
                 file.write(f"TPR = {TPR}\n")
 
-            print("Parameters saved and initialized.")
+            thermo_msg = "Parameters saved and initialized."
+            print(thermo_msg)
+            debug_log.debug(thermo_msg, context="Thermodynamic_calc_GUI")
         except ValueError:
-            print("Please enter valid numbers for all conditions.")
+            thermo_err = "Please enter valid numbers for all conditions."
+            print(thermo_err)
+            debug_log.debug(thermo_err, context="Thermodynamic_calc_GUI")
 
     ttk.Button(root, text="Save and Initialize Parameters", command=save_and_initialize).pack(pady=10)
 

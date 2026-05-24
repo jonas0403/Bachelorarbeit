@@ -42,3 +42,6 @@ structure.txt
 # Temporary / local config
 *.bak
 *.tmp
+
+# Agent session tracking
+Docs/AGENTS.md

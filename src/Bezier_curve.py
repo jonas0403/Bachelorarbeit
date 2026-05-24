@@ -7,6 +7,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.widgets import Slider
+import debug_log
 
 def bezier(Points, t, yy):
     yb = 9999
@@ -81,5 +82,7 @@ def adjustBezierCurve(BezierPoints):
     for i in range(len(d_lB)):
         d_lB[i] = round(d_lB[i], 2)
 
-    print(f"New Bézier Point: {d_lB}")
+    bezier_msg = f"New Bezier Point: {d_lB}"
+    print(bezier_msg)
+    debug_log.debug(bezier_msg, context="bezier")
     return BezierPoints

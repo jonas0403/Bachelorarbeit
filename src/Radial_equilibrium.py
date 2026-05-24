@@ -6,6 +6,7 @@
 import math
 import numpy as np
 import matplotlib as plt
+import debug_log
 
 Pi = math.pi
 
@@ -232,7 +233,9 @@ def radial_equilibrium_R(stage, approach, constant_r_parameter, D_S1, D_S2, D_S3
         elif constant_r_parameter == 2:
             r_R_in.append(D_S1[stg_idx]/2.0 + (h_rel[i]-1)*b1_m)
         else:
-            print("Allowed constant radius parameter: 0, 1 and 2.")
+            radius_err = "Allowed constant radius parameter: 0, 1 and 2."
+            print(radius_err)
+            debug_log.debug(radius_err, context="radial_equilibrium_R")
 
     c_m_R_in, c_u_R_in, u_R_in, w_R_in, T_R_in, p_R_in, Ma_abs_R_in, Ma_rel_R_in, roh_R_in, alpha_R_in, beta_R_in = [], [], [], [], [], [], [], [], [], [], []
     for i in range(len(h_rel)):
@@ -267,7 +270,9 @@ def radial_equilibrium_R(stage, approach, constant_r_parameter, D_S1, D_S2, D_S3
         elif constant_r_parameter == 2:
             r_R_out.append(D_S2[stg_idx]/2.0 + (h_rel[i]-1)*b2_m)
         else:
-            print("Allowed constant radius parameter: 0, 1 and 2.")
+            radius_err = "Allowed constant radius parameter: 0, 1 and 2."
+            print(radius_err)
+            debug_log.debug(radius_err, context="radial_equilibrium_R")
 
     c_m_R_out, c_u_R_out, c_R_out, u_R_out, w_R_out, T_R_out, p_R_out, Ma_abs_R_out, Ma_rel_R_out, roh_R_out, alpha_R_out, beta_R_out = [], [], [], [], [], [], [], [], [], [], [], []
     for i in range(len(h_rel)):
@@ -393,7 +398,9 @@ def radial_equilibrium_S(stage, approach, constant_r_parameter, D_S1, D_S2, D_S3
         elif constant_r_parameter == 2:
             r_S_out.append(D_S3[stg_idx]/2.0 + (h_rel[i]-1)*b3_m)
         else:
-            print("Allowed constant radius parameter: 0, 1 and 2.")
+            radius_err = "Allowed constant radius parameter: 0, 1 and 2."
+            print(radius_err)
+            debug_log.debug(radius_err, context="radial_equilibrium_S")
 
     c_S_out = [math.sqrt(c_m_S_out[i]**2 + c_u_S_out[i]**2) for i in range(len(h_rel))]
     

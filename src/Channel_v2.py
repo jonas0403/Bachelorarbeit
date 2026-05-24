@@ -7,6 +7,7 @@
 import math 
 import numpy as np
 import matplotlib.pyplot as plt
+import debug_log
 #from Fixed_radii_Meanline_GUI_v4 import meanline 
 from Cubspline_function_v2 import cubspline
 
@@ -121,14 +122,14 @@ def channel(compressor_gui_data):
     
     
 
-    print(f"{l_R}")
+    debug_log.debug(f"l_R={l_R}", context="channel")
 
     # factors for space between the rows    
     Rotor = [0.4, 0.15, 0.2]
     Stator = [0.3, 0.15, 0.4]
     
     t0 = np.arange(-1.0, 8.0, 1.0)
-    print(f"alkskashdk {inlet_dist}")
+    debug_log.debug(f"inlet_dist={inlet_dist}", context="channel")
 
     x0 = np.full_like(t0, 0)
     x0[1] = 0
@@ -429,7 +430,7 @@ def channel(compressor_gui_data):
     # Hardcoded hights for the channel calculation
     h_H = [0.0, 0.2, 0.5, 0.8, 1.0]
 
-    print(f"{l_R}")
+    debug_log.debug(f"l_R={l_R}", context="channel")
 
     # factors for space between the rows    
     Rotor = [0.4, 0.15, 0.2]
@@ -438,13 +439,32 @@ def channel(compressor_gui_data):
     t0 = np.arange(-1.0, 8.0, 1.0)
     #print(f"alkskashdk {inlet_dist}")
     start_x = getattr(compressor_gui_data, 'current_x_offset', 0.0)
+    
     x0 = np.full_like(t0, 0)
-    x0[1] = start_x
+    # BUGFIX v2: x0[1] was set to start_x (cumulative offset) while x0[2..8] remained
+    # in local coordinates (relative to 0). This created a non-monotonic x0 array
+    # like [0, 272, 40, 73, ...] for internal stages, making the cubspline produce
+    # a V-shaped channel. The non-monotonic channel corrupted interpolation along
+    # the meridional coordinate, producing NaN in blade surface R*theta coordinates,
+    # which propagated to the MULTALL .dat file as negative volumes.
+    # Fix: keep ALL x0 values in local coordinates. The cumulative offset is applied
+    # uniformly to x0[0..8] by init_channel_data() in Stage_v3_working_with_bleedair.py.
+    # OLD: x0[1] = start_x
+    x0[1] = 0.0  # local coordinate; global offset applied in init_channel_data()
     x0[2] = round(Rotor[0]*l_R, 1)
     if stage == 1:
         x0[0] = -inlet_dist * l_R
     else:
-        x0[0] = -1*round((x0[2]-x0[1])/(1-Rotor[0]), 0)
+        # BUGFIX v2: x0[0] must differ from x0[1] (=0) to give the inlet section
+        # a non-zero axial extent. With x0[0]=x0[1]=0, the linear extrapolation for
+        # t<0 produces x_N=0 for all 41 inlet points (and r_N constant at r0_N[1]),
+        # collapsing m_prime to 0 everywhere in the inlet. intpol() then hits
+        # duplicate x-values → division by zero → NaN in blade coordinates.
+        # Fix: use a small negative inlet (~10mm) for internal stages.
+        # This also avoids the 36mm overlap the original -0.667*l_R caused.
+        # OLD (stage 2+): x0[0] = 0.0  (collapsed inlet → NaN)
+        # OLDER (stage 2+): x0[0] = -1*round((x0[2]-x0[1])/(1-Rotor[0]), 0)  (~40-90mm overlap)
+        x0[0] = -10.0  # small inlet duct (10mm) to prevent degenerate interpolation
     x0[3] = x0[2] + round((1+Rotor[1]) * l_R *(math.sin((beta_blade_1+beta_blade_2)/(2*180)*Pi)),1)
     x0[4] = x0[3] + round(Rotor[2]*l_R,1)
     x0[5] = x0[4] + round((Stator[0]+Stator[1]/2)*l_S, 1)
@@ -524,7 +544,8 @@ def channel(compressor_gui_data):
         r_S3_in = D_S3 / 2
         r_H3_in = D_H3 / 2
         old_area = math.pi * (r_S3_in**2 - r_H3_in**2)
-        new_area = old_area * inlet_area
+        # BUGFIX: was old_area * inlet_area (copy-paste error from intake block)
+        new_area = old_area * outlet_area
         
         if fixed_radius_type == 'mean':
             delta_r = (new_area - old_area) / (2 * math.pi * (r_H3_in + r_S3_in))
@@ -592,6 +613,12 @@ def channel(compressor_gui_data):
     for i in range(9):
         channelHeight.append(r0_G[i] - r0_N[i]) 
 
+    # BUGFIX: r_N and r_G are in meters (from meanline diameters D_H/D_S),
+    # but x_N/x_G are in mm (from meanline chord lengths l_R/l_S).
+    # Convert r to mm for unit consistency in arc-length and downstream /1000.
+    r_N = [val * 1000.0 for val in r_N]
+    r_G = [val * 1000.0 for val in r_G]
+
     # for plotting of channel geometry, please activate
     if channelPlot == 1:
         plt.scatter(x0, r0_N)
@@ -603,7 +630,6 @@ def channel(compressor_gui_data):
         plt.scatter(x0, r0_G)
         plt.plot(x_G, r_G, label = 'Shroud')
         plt.axis('equal')
-        plt.legend()
         plt.ylabel('radii [mm]')
         plt.xlabel('axial length [mm]')
 

@@ -7,6 +7,7 @@
 import math 
 import numpy as np
 import matplotlib.pyplot as plt
+import debug_log
 
 from Cubspline_function_v2 import cubspline
 
@@ -374,7 +375,7 @@ def plot_channel(D_S1, D_S2, D_S3, D_H1, D_H2, D_H3, D_M1, D_M2, D_M3,i_st, l_R,
     plt.grid(True)
     plt.tight_layout() # Adjust layout to prevent labels from being cut off
     
-    print("Attempting to show plot window...") # Debugging print statement
+    debug_log.debug("Attempting to show plot window...", context="plot_channel")
     plt.show(block=True) # Ensure the plot window blocks execution until closed
-    print("Plot window closed or script continued.") # Debugging print statement
+    debug_log.debug("Plot window closed or script continued.", context="plot_channel")
 # The return values should now be lists of lists, one for each stage

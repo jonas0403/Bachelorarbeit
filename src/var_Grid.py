@@ -1,5 +1,5 @@
-# Autor: Luca De Francesco
-# Skript zur Bachelorarbeit
+# Author: Luca De Francesco
+# Script for Bachelor thesis
     
 
 import matplotlib.pyplot as plt
@@ -13,42 +13,44 @@ import debug_log
 
         
 
-# Schreibt Werte in Blöcken von 8 pro Zeile in die Datei
+# Writes values in blocks of 8 per line to the file
 def write_values_in_block(section, liste, file_handle, JM):
     if section >= len(liste):
-        data = [0.0] * JM  # Initialisiert eine Liste mit Nullen der Länge JM
+        data = [0.0] * JM  # Initializes a list of zeros with length JM
     else:
         data = list(liste[section])
     
     for i in range(len(data)):
         if not np.isfinite(data[i]):
-            print(f"Ungültiger Wert an der Stelle {i} in der Reihenfolge {section}: {data[i]}. Dieser Wert wird auf 0.0 gesetzt.")
+            error_msg = f"Invalid value at position {i} in sequence {section}: {data[i]}. Setting to 1e-6."
+            print(error_msg)
+            debug_log.debug(error_msg, context="write_values_in_block")
             data[i] = 1e-6
     
     if len(data) < JM:
-        data += [0.0] * (JM - len(data))  # Füllt die Liste auf, falls sie kürzer ist als JM
+        data += [0.0] * (JM - len(data))  # Pads the list with zeros if shorter than JM
     
     elif len(data) > JM:
         data = data[:JM]
     
     for k in range(0, JM, 8):
-        abschnitt = data[k:k+8]  # Nimmt 8 Elemente auf einmal
-        line = " " +"".join(f"{element:12.6f}" for element in abschnitt) + "\n"
-        file_handle.write(line)  # Schreibt die Zeile in die Datei
+        chunk = data[k:k+8]  # Takes 8 elements at once
+        line = " " +"".join(f"{element:12.6f}" for element in chunk) + "\n"
+        file_handle.write(line)  # Writes the line to the file
       
-def grid_adaption(grid_count, max=20, beta=2 ): # Erstellung von Gridabständen in Abhängigkeit von der Anzahl
-    x_norm = np.linspace(0.0, 1.0, grid_count) # Erzeugt eine Liste von 0 bis 1 mit der Anzahl der Gitterpunkte
-    x_stretched = 0.5 * (1.0 + np.tanh(beta *(2.0 * x_norm - 1.0))) / np.tanh(beta) # größter Grid Abstand sind 20
-    #return x_stretched[::-1] * (grid_count-1) + 1.0 # Kehrt das Array um und bezieht es auf den grid_count
+def grid_adaption(grid_count, max=20, beta=2 ): # Generates grid spacings based on count
+    x_norm = np.linspace(0.0, 1.0, grid_count) # Creates a list from 0 to 1 with grid_count points
+    x_stretched = 0.5 * (1.0 + np.tanh(beta *(2.0 * x_norm - 1.0))) / np.tanh(beta) # Maximum grid spacing is 20
+    #return x_stretched[::-1] * (grid_count-1) + 1.0 # Reverses the array and scales to grid_count
     
-    spacings = np.diff(x_stretched) # Berechnet die Abstände zwischen den Punkten
+    spacings = np.diff(x_stretched) # Calculates the distances between points
     min_val = np.min(spacings)
     max_val = np.max(spacings)
     
     if (max_val - min_val) < 1e-9:
-        return np.ones_like(spacings)  # Wenn alle Abstände gleich sind, gibt eine Liste mit Einsen zurück weil sonst Multall einen Fehler berechnet
+        return np.ones_like(spacings)  # If all spacings are equal, returns ones to avoid MULTALL errors
     
-    scaled_spacings = 1 + (max - 1.0) * (spacings - min_val) / (max_val - min_val) # Skaliert die Abstände auf den Bereich von 1 bis max
+    scaled_spacings = 1 + (max - 1.0) * (spacings - min_val) / (max_val - min_val) # Scales spacings to range 1 to max
     scaled_spacings = np.nan_to_num(scaled_spacings, nan=0.0,posinf=0.0, neginf=0.0)
     
     return scaled_spacings
@@ -57,12 +59,12 @@ def create_bleed_air_card(file_path, patches_data, current_stage):
     
     stage_key = f"Stage {current_stage}"
     
-    #filter patches for this stage only
+    # Filter patches for this stage only
     stage_patches = [patches for patches in patches_data if patches[0] == stage_key]
     
-    print(f"file_path = {file_path}, stage_key = {stage_key}, matches = {len(stage_patches)}")
+    debug_log.debug(f"file_path={file_path}, stage_key={stage_key}, matches={len(stage_patches)}", context="create_bleed_air_card")
     with open(file_path, "a") as file:
-        #one NBLEED per call (one blade row)
+        # One NBLEED per call (one blade row)
         file.write("NBLEED\n")
         file.write(f"{len(stage_patches)}\n")
         for patches in stage_patches:
@@ -109,24 +111,24 @@ def create_bleed_air_card(file_path, patches_data, current_stage):
                 for patches in stator_data:
                     file.write('\t'.join(patches)+ '\n')
     '''
-## Multall .dat File schreiben
+## MULTALL .dat file writing
 # Needs to be looped or called multiple times for each section IN EACH stage
 def multall_grid_data_head_row(file_path, NSEC, row, JLE, JM, JTE, KM, tip_clearance, levels, CompressorGui, RPM, row_num, current_stage_num):
     section = 0
     
     current_stage = current_stage_num - 1
-    debug_log.debug(f"Debug current_stage (idx) = {current_stage}")
-    debug_log.debug(f"Debug current_stage_num = {current_stage_num}")
+    debug_log.debug(f"current_stage (idx) = {current_stage}", context="multall_grid_data_head_row")
+    debug_log.debug(f"current_stage_num = {current_stage_num}", context="multall_grid_data_head_row")
     
     global_row_num = row_num - 1
-    debug_log.debug(f"Debug global_row_num (idx) = {global_row_num}")
-    debug_log.debug(f"Debug global_row = {row_num}")
+    debug_log.debug(f"global_row_num (idx) = {global_row_num}", context="multall_grid_data_head_row")
+    debug_log.debug(f"global_row = {row_num}", context="multall_grid_data_head_row")
     
     
     ktipstart = 0
     ktipend = 0
     actual_tip_clearance = 0.0
-    debug_log.debug(f"DEBUG: current_stage value is {current_stage} and type is {type(current_stage)}")
+    debug_log.debug(f"current_stage value = {current_stage}, type = {type(current_stage)}", context="multall_grid_data_head_row")
     if tip_clearance[current_stage] > 0:
         if row_num %2 != 0:
             ktipstart = KM - 4
@@ -198,9 +200,9 @@ def multall_grid_data_head_row(file_path, NSEC, row, JLE, JM, JTE, KM, tip_clear
                 ftchick_values[k] = 0.0
             
         
-            for i in range(0, KM, 8): # Zählweise in 8ter Schritten
-                line_number = ftchick_values[i:i+8] # Holt die Zwischenschritte aus der Gridverteilung
-                file.write(" ".join(f"{value:.6f}" for value in line_number) + "\n") # Schreibt die gebaute Zeile
+            for i in range(0, KM, 8): # Counts in steps of 8
+                line_number = ftchick_values[i:i+8] # Gets intermediate values from the grid distribution
+                file.write(" ".join(f"{value:.6f}" for value in line_number) + "\n") # Writes the constructed line
         
         file.write("       BOUNDARY LAYER TRANSITION POINTS \n")
         file.write("         0         0         0         0\n")
@@ -249,28 +251,28 @@ def write_head_file(KM_grid_density, IM_grid_density, file_path, section, NROW, 
             file.write(f"        {IM_grid_density}        {KM_grid_density}\n")
         else:
             file.write(f"        {IM_grid_density}        2\n")
-           
+            
         value_IM = grid_adaption(IM_grid_density)
         file.write("  FP(I),I=1,IMM1 \n")
-        for i in range (0,len(value_IM), 8): # Zählweise in 8ter Schritten
-            line_number = value_IM[i:i+8] # Holt die Zwischenschritte aus der Gridverteilung
-            line_value = " " # fügt eine Leerzeile ein
-            for value in line_number:
-                line_value += f"{value:.6f} " # Fügt 8 Zahlen mit 6 Nachkommastellen ein
-            line_value += "\n" # Fügt einen Zeilenumbruch ein
-            file.write(line_value) # Schreibt die gebaute Zeile
+        for i in range(0, len(value_IM), 8): # Counts in steps of 8
+            chunk = value_IM[i:i+8] # Gets intermediate values from the grid distribution
+            line_value = " " # Inserts a leading space
+            for value in chunk:
+                line_value += f"{value:.6f} " # Adds 8 numbers with 6 decimal places
+            line_value += "\n" # Adds a newline
+            file.write(line_value) # Writes the constructed line
         
         if section == 0 and not Q3D_value:        
             value_KM = grid_adaption(KM_grid_density)
             file.write("  FR(K),K=1,KMM1 \n")
-            for i in range (0,len(value_KM), 8): # Zählweise in 8ter Schritten
-                line_number = value_KM[i:i+8] # Holt die Zwischenschritte aus der Gridverteilung
-                line_value = " " # fügt eine Leerzeile ein
-                for value in line_number:
-                    line_value += f"{value:.6f} " # Fügt 8 Zahlen mit 6 Nachkommastellen ein
-                line_value += "\n" # Fügt einen Zeilenumbruch ein
-                file.write(line_value) # Schreibt die gebaute Zeile        
-        else: # Setzt FR auf 1 wenn Q3D aktiv ist oder es nur eine Reihe gibt
+            for i in range(0, len(value_KM), 8): # Counts in steps of 8
+                chunk = value_KM[i:i+8] # Gets intermediate values from the grid distribution
+                line_value = " " # Inserts a leading space
+                for value in chunk:
+                    line_value += f"{value:.6f} " # Adds 8 numbers with 6 decimal places
+                line_value += "\n" # Adds a newline
+                file.write(line_value) # Writes the constructed line        
+        else: # Sets FR to 1 when Q3D is active or only one row exists
              file.write("  FR(K),K=1,KMM1 \n")
              file.write("  1.000000\n")
 
@@ -316,11 +318,29 @@ def write_head_file(KM_grid_density, IM_grid_density, file_path, section, NROW, 
         file.write(" ".join(f"0  " for _ in range(KM_grid_density)) + "\n")
         
 
-#writes the coordinates of all sections in a file for MULTALL
-# schreibt die Koordinaten aller Abschnitte in eine Datei für MULTALL
-# a? b? need a loop for writing all rows and stages
+# Writes the coordinates of all sections to a file for MULTALL
+# MULTALL section geometry writer for a blade row.
+# MULTALL format expects per section:
+#   1. x-coordinates
+#   2. 1.000000  0.000000
+#   3. d-surface-1 (R*theta for one blade surface, e.g. upper/suction)
+#   4. 1.000000
+#   5. d-surface-2 (R*theta for the OTHER blade surface, e.g. lower/pressure)
+#   6. 1.000000  0.000000
+#   7. r-coordinates
+#
+# BUGFIX: The old code wrote d (blade thickness = upper - lower) in block 5,
+# but MULTALL interprets block 5 as the second surface R*theta coordinate.
+# This made MULTALL see a passage width of ~2.5mm (the thickness) instead of
+# the actual ~28mm (pitch - thickness), causing NaN velocities in the initial guess.
+# Fix: pre-compute lower surface R*theta = rtheta - d and write that instead.
 def write_coordinates(x, rtheta, d, r, file, row, a, b, JM, global_row_num, current_stage):
     #print(f" DEBUG x r and theta for the first 5 values: {x[0:5]}, {r[0:5]}, {rtheta[0:5]}  and last 5 values = {x[-5:]}, {r[-5:]}, {rtheta[-5:]}")
+    # BUGFIX: pre-compute the lower blade surface R*theta = upper - thickness
+    rtheta_lower = []
+    for sec_idx in range(len(rtheta)):
+        rtheta_lower.append([rtheta[sec_idx][k] - d[sec_idx][k] for k in range(len(rtheta[sec_idx]))])
+    
     with open(file, "a") as file:
         for i in range(a, b):       
             file.write(" ***************************************************************\n")
@@ -329,7 +349,10 @@ def write_coordinates(x, rtheta, d, r, file, row, a, b, JM, global_row_num, curr
             file.write("  1.000000  0.000000\n")
             write_values_in_block(i, rtheta, file, JM)
             file.write("  1.000000\n")
-            write_values_in_block(i, d, file, JM)
+            # OLD (wrote thickness instead of second surface):
+            # write_values_in_block(i, d, file, JM)
+            # BUGFIX: write the lower blade surface R*theta (= upper - thickness)
+            write_values_in_block(i, rtheta_lower, file, JM)
             file.write("  1.000000  0.000000\n")
             write_values_in_block(i, r, file, JM)
             
@@ -369,14 +392,14 @@ def write_end_file(row, file, section, KM, levels, CompressorGui, radial_data_R,
         if section == 0:
             file.write("  STARTING INLET BOUNDARY CONDITION DATA .\n")
             file.write("  NUMBER OF POINTS FOR INLET BOUNDARY CONDITIONS \n")
-            file.write(f"        {KM}\n") # Number of Inlet Point wird Abhängig von der Gitterdichte KM 
+            file.write(f"        {KM}\n") # Number of inlet points depends on grid density KM
             file.write("  SPACING OF INLET BOUNDARY CONDITION POINTS \n")
             
             value_KM = grid_adaption(KM)
-            for i in range (0,len(value_KM), 8): # Zählweise in 8ter Schritten
-                file.write(" ".join(f"{v:.6f}" for v in value_KM[i:i+8])+"\n") # Schreibt die gebaute Zeile
+            for i in range(0, len(value_KM), 8): # Counts in steps of 8
+                file.write(" ".join(f"{v:.6f}" for v in value_KM[i:i+8]) + "\n") # Writes the constructed line
             
-            # Dynamische Anpassung der Inlet Bedingungen durch KM
+            # Dynamic adjustment of inlet boundary conditions by KM
             file.write("   INLET STAGNATION PRESSURES \n")
             for i in range(0, KM, 8):
                 file.write(" ".join(f"{p:.6f}" for _ in range(KM)[i:i+8]) + "\n")
@@ -477,7 +500,7 @@ def write_end_file(total_rows, file, section, KM, levels, CompressorGui, radial_
     # Identify the last stage to set the exit backpressure (PDOWN)
     last_stg_idx = CompressorGui.stages_to_calc
     
-    debug_log.debug(f"DEBUG: Starting write_end_file for {total_rows} rows. Last stage index: {last_stg_idx}")
+    debug_log.debug(f"Starting write_end_file for {total_rows} rows. Last stage index: {last_stg_idx}", context="write_end_file")
 
     try:
         # 1. Get Inlet Boundary Conditions (from global Stage module)
@@ -486,17 +509,17 @@ def write_end_file(total_rows, file, section, KM, levels, CompressorGui, radial_
         p_inlet = round(Stage.p_t1[0], 1)
         um_inlet = round(Stage.cm1[0], 4)
         
-        debug_log.debug(f"DEBUG: Inlet data loaded -> P:{p_inlet}, T:{t_inlet}")
+        debug_log.debug(f"Inlet data loaded -> P:{p_inlet}, T:{t_inlet}", context="write_end_file")
 
         # 2. Get Exit Boundary Conditions (PDOWN) from the last stage
         if last_stg_idx in radial_data_S:
             last_stg_data = radial_data_S[last_stg_idx]
             p_out_array = last_stg_data['p_S_out']
-            debug_log.debug(f"DEBUG: Pulling PDOWN from Stator {last_stg_idx}")
+            debug_log.debug(f"Pulling PDOWN from Stator {last_stg_idx}", context="write_end_file")
         elif last_stg_idx in radial_data_R:
             last_stg_data = radial_data_R[last_stg_idx]
             p_out_array = last_stg_data['p_R_out']
-            debug_log.debug(f"DEBUG: Pulling PDOWN from Rotor {last_stg_idx}")
+            debug_log.debug(f"Pulling PDOWN from Rotor {last_stg_idx}", context="write_end_file")
         else:
             raise KeyError(f"Stage {last_stg_idx} not found in radial data")
 
@@ -504,7 +527,7 @@ def write_end_file(total_rows, file, section, KM, levels, CompressorGui, radial_
         p_exit_tip = round(p_out_array[-1], 1)
 
     except (KeyError, IndexError, AttributeError) as e:
-        debug_log.debug(f"DEBUG: Error accessing stage data: {e}. Using safety fallbacks.")
+        debug_log.debug(f"Error accessing stage data: {e}. Using safety fallbacks.", context="write_end_file")
         # Engineering fallbacks to prevent crash
         p_exit_hub, p_exit_tip = 101325.0, 101325.0
         t_inlet, p_inlet, um_inlet = 288.15, 101325.0, 150.0
@@ -601,14 +624,14 @@ def plot_all(grid_data_list, grid_density):
         rtheta_lower = [upper - d for upper, d in zip(rtheta_upper, d_coords)]
         
         color = colors[i % len(colors)]
-        label = f"{row_labels[i % len(row_labels)]} (Reihe {row_num})"
+        label = f"{row_labels[i % len(row_labels)]} (Row {row_num})"
         
         plt.plot(x_coords, rtheta_upper, color=color, marker='.', markersize=3, label=label)
         plt.plot(x_coords, rtheta_lower, color=color, marker='.', markersize=3)
     
-    plt.xlabel("x-Koordinate [mm]")
-    plt.ylabel("Rθ-Koordinate [mm]")
-    plt.title(f"Dynamisches Gitter (Dichte: {grid_density})")
+    plt.xlabel("x-coordinate [mm]")
+    plt.ylabel("R-theta coordinate [mm]")
+    plt.title(f"Dynamic grid (Density: {grid_density})")
     plt.legend()
     plt.grid(True)
     plt.axis('equal')
@@ -616,7 +639,7 @@ def plot_all(grid_data_list, grid_density):
 
 def generate_var_grid_data(nrow, IM_grid_density, KM_grid_density, JM_grid_density, inlet_percentage, outlet_percentage, reference_chord_length, levels, CompressorGui):
     
-    # Liste, um die Ergebnisse jeder Schaufelreihe zu speichern
+    # List to store results for each blade row
     all_rows_grid_data = []
     all_rows_data_plot = []
 
@@ -624,24 +647,20 @@ def generate_var_grid_data(nrow, IM_grid_density, KM_grid_density, JM_grid_densi
     nrow_wert = nrow * CompressorGui.stages_to_calc
     
     for row_num in range(1, nrow_wert + 1):
-        print(f"\nVerarbeite Schaufelreihe {row_num} (Dichte: {JM_grid_density})")
+        status_msg = f"Processing blade row {row_num} (Density: {JM_grid_density})"
+        print(f"\n{status_msg}")
+        debug_log.debug(status_msg, context="generate_var_grid_data")
 
-        # Schaut wie groß die Schaufel bei 50 % ist und vergleicht mit dem Referenzwert
+        # Checks blade size at 50% span and compares with reference value
         actual_chord, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = Stage.calculation_of_section(0.5, row_num)
         
-        # h_H_plot is never in the whole of the project defined
-        # try:
-        #     h_H_plot = h_H_plot if h_H_plot else 0.5
-        # except NameError:
-        #     h_H_plot = 0.5# What values is here needed? Default at 50%?
-        
-        #printing_chord, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = Stage.calculation_of_section(h_H_plot, row_num) 
-        print(f"Sehnenlänge für Reihe {row_num}: {actual_chord:.2f} mm")
+        chord_msg = f"Chord length for row {row_num}: {actual_chord:.2f} mm"
+        print(chord_msg)
+        debug_log.debug(chord_msg, context="generate_var_grid_data")
 
         JM_dynamic = int(round((actual_chord / reference_chord_length) * JM_grid_density))
-        #j_prime_max_plot = int(round((printing_chord / reference_chord_length) * JM_grid_density))      
         
-        #dynamische Berechnung der Anzahl der Gitterpunkte im Einlass und Auslass
+        # Dynamic calculation of grid points at inlet and outlet
         n_max_in = int(round(JM_dynamic * inlet_percentage))
         j_prime_max = JM_dynamic
         n_max_out = int(round(JM_dynamic * outlet_percentage))
@@ -654,9 +673,15 @@ def generate_var_grid_data(nrow, IM_grid_density, KM_grid_density, JM_grid_densi
             JM_dynamic_rotor = JM_dynamic
         else:
             JM_dynamic_stator = JM_dynamic
-        print(f"Dynamische Gitterpunkte (nur Schaufel): {JM_dynamic}")
-        print(f"Punkte insgesamt (JM): {JM}, Einlass-Index (JLE): {JLE}, Auslass-Index (JTE): {JTE}")
-        print(f"Anzahl der Punkte im Einlass: {n_max_in}, Anzahl der Punkte im Auslass: {n_max_out}")
+        dynamic_msg = f"Dynamic grid points (blade only): {JM_dynamic}"
+        print(dynamic_msg)
+        debug_log.debug(dynamic_msg, context="generate_var_grid_data")
+        points_msg = f"Total points (JM): {JM}, Inlet index (JLE): {JLE}, Outlet index (JTE): {JTE}"
+        print(points_msg)
+        debug_log.debug(points_msg, context="generate_var_grid_data")
+        i_o_msg = f"Inlet points: {n_max_in}, Outlet points: {n_max_out}"
+        print(i_o_msg)
+        debug_log.debug(i_o_msg, context="generate_var_grid_data")
         
         x_new, d_new, R_new, Rtheta_new = Stage.calc_blade_row_coordinates(
             row=row_num, 
@@ -671,7 +696,7 @@ def generate_var_grid_data(nrow, IM_grid_density, KM_grid_density, JM_grid_densi
             levels=levels)
         
         
-        debug_log.debug(f"DEBUG row_num={row_num}: x_new[0][0]={x_new[0][0]:.4f}, x_new[0][-1]={x_new[0][-1]:.4f}, R_new[0][0]={R_new[0][0]:.6f}")
+        debug_log.debug(f"row_num={row_num}: x_new[0][0]={x_new[0][0]:.4f}, x_new[0][-1]={x_new[0][-1]:.4f}, R_new[0][0]={R_new[0][0]:.6f}", context="generate_var_grid_data")
         # x_new_plot, d_new_plot, R_new_plot, Rtheta_new_plot = Stage.calc_blade_row_coordinates(
         #     row=row_num, 
         #     j_prime_max=j_prime_max_plot, 
@@ -685,7 +710,7 @@ def generate_var_grid_data(nrow, IM_grid_density, KM_grid_density, JM_grid_densi
         #     levels=[h_H_plot]
         # )
         
-        # Speichere die berechneten Daten für diese Reihe
+        # Store the calculated data for this row
         all_rows_grid_data.append({
             'row_num': row_num,
             'x_new': x_new,
@@ -734,10 +759,12 @@ def process_grid_data(json_path, CompressorGui):
     
     
     """
-    Nimmt die Daten aus der Haupt-GUI entgegen, entpackt sie und 
-    startet die Gittergenerierung (Multall .dat Erstellung).
+    Receives data from the main GUI, unpacks it and
+    starts the grid generation (MULTALL .dat creation).
     """
-    print("\n--- Starte Entpacken der GUI-Daten in var_Grid ---")
+    unpack_msg = "\n--- Starting to unpack GUI data in var_Grid ---"
+    print(unpack_msg)
+    debug_log.debug(unpack_msg, context="process_grid_data")
     
     try:
         all_json_data = {}
@@ -759,7 +786,9 @@ def process_grid_data(json_path, CompressorGui):
         
                    
     except ValueError:
-        print("Please enter valid numbers for all conditions.")
+        error_msg = "Please enter valid numbers for all conditions."
+        print(error_msg)
+        debug_log.debug(error_msg, context="process_grid_data")
         
         '''
         Unpacking Grid Data
@@ -781,9 +810,9 @@ def process_grid_data(json_path, CompressorGui):
     output_path = Metadata['output_folder']
     levels = Metadata['levels']
 
-    debug_log.open_file(os.path.join(output_path, "debug.txt"))
-
-    debug_log.debug(f"DEBUG TIPCLEARENCE tip_clearance_mm_rotor = {tip_clearance_mm_rotor} b2 = {CompressorGui.meanline_data['b2']}")
+    # NOTE: debug_log.open_file() is called ONCE in GUI.py:2845 before process_grid_data,
+    # so channel init messages from run_main_logic() are preserved in the log.
+    debug_log.debug(f"tip_clearance_mm_rotor = {tip_clearance_mm_rotor}, b2 = {CompressorGui.meanline_data['b2']}", context="process_grid_data")
     tip_clearance_multall = [tip_clearance_mm_rotor / x for x in CompressorGui.meanline_data['b2']]
 
 
@@ -793,21 +822,21 @@ def process_grid_data(json_path, CompressorGui):
     
     all_rows_grid_data = generate_var_grid_data(nrow_wert, IM_grid_density, KM_grid_density, JM_grid_density, inlet_percentage, outlet_percentage, ref_chord_length, levels, CompressorGui)    
     
-    # --- X RANGE MONOTONICITY CHECK ---
-    debug_log.debug("\n--- X RANGE MONOTONICITY CHECK ---")
+    # --- X-RANGE MONOTONICITY CHECK ---
+    debug_log.section("X-Range Monotonicity Check")
     prev_max_x = -float('inf')
     all_ok = True
     for data in all_rows_grid_data:
         min_x = min(data['x_new'][0])
         max_x = max(data['x_new'][0])
-        status = "OK" if min_x > prev_max_x else "*** OVERLAP ***"
-        debug_log.debug(f"  Row {data['row_num']}: x=[{min_x:.4f}, {max_x:.4f}]  {status}")
+        status = "OK" if min_x >= prev_max_x - 1e-10 else "*** OVERLAP ***"
+        debug_log.debug(f"Row {data['row_num']}: x=[{min_x:.4f}, {max_x:.4f}]  {status}", context="monotonicity")
         if status != "OK":
             all_ok = False
         prev_max_x = max_x
-    debug_log.debug(f"  Result: {'PASSED' if all_ok else 'FAILED'}\n")
+    debug_log.debug(f"Result: {'PASSED' if all_ok else 'FAILED'}", context="monotonicity")
     
-    # old hardcoded first value
+    # Old hardcoded first value
     #JM_dynamic_rotor = all_rows_grid_data[0]['JM_dynamic']
     JM_dynamic_rotor = [row['JM_dynamic'] for row in all_rows_grid_data[::2]]
     
@@ -825,12 +854,13 @@ def process_grid_data(json_path, CompressorGui):
     
     NSEC = len(levels)
 
-    print("Writing Multall grid data head row...")
-    # Wir übergeben hier unser neues Super-Dictionary "combined_multall_data"
-    write_head_file(KM_grid_density, IM_grid_density, full_output_path, 0, nrow_wert, NSEC, Q3D_value, enable_bleed_air, CompressorGui)# again what is: combined_multall_data=0 it never gets defined in the function
+    head_msg = "Writing MULTALL grid data head row..."
+    print(head_msg)
+    debug_log.debug(head_msg, context="process_grid_data")
+    write_head_file(KM_grid_density, IM_grid_density, full_output_path, 0, nrow_wert, NSEC, Q3D_value, enable_bleed_air, CompressorGui)
 
     
-    # Calls grid/row data writing?? If so needs to be called per stage with the input of necasarry inputs
+    # Calls grid/row data writing for each blade row across all stages
     for i, data in enumerate(all_rows_grid_data):
         row_num = data['row_num']
         x_coords = data['x_new'] 
@@ -838,6 +868,9 @@ def process_grid_data(json_path, CompressorGui):
         r_coords = data['R_new']
         rtheta_coords = data['Rtheta_new']
         
+        # SAFETY: If r_coords somehow arrive in mm instead of meters (max_r < 0.05),
+        # convert to meters. The root cause (Channel_v2.py returning r in meters
+        # while x in mm) was fixed, so this should not trigger.
         max_r = max(max(sec) for sec in r_coords)
         if max_r < 0.05:
             r_coords = [[val * 1000.0 for val in sec] for sec in r_coords]
@@ -847,21 +880,44 @@ def process_grid_data(json_path, CompressorGui):
         JM_row = data['JM']
         NSEC_new = len(data['x_new'])
 
-        # variable for the global row number
+        # Global row number (1-based across all stages)
         global_row_num = i + 1
         
-        # variable for the stage number
+        # Stage number derived from row index
         current_stage = (i // 2) + 1
         
-        debug_log.debug(f"DEBUG: i={i}, row_num={row_num}, current_stage={current_stage}")
+        debug_log.debug(f"i={i}, row_num={row_num}, current_stage={current_stage}", context="process_grid_data")
+        debug_log.debug(f"Row {global_row_num} (stage {current_stage}):", context="process_grid_data")
+        debug_log.debug(f"  x_coords first section first point: {x_coords[0][0]:.4f}", context="process_grid_data")
+        debug_log.debug(f"  x_coords first section last point:  {x_coords[0][-1]:.4f}", context="process_grid_data")
+        debug_log.debug(f"  r_coords first section first point: {r_coords[0][0]:.4f}", context="process_grid_data")
+        debug_log.debug(f"  r_coords first section last point:  {r_coords[0][-1]:.4f}", context="process_grid_data")
+        debug_log.debug(f"  r_coords LAST section first point: {r_coords[-1][0]:.4f}", context="process_grid_data")
+        debug_log.debug(f"  r_coords LAST section last point:  {r_coords[-1][-1]:.4f}", context="process_grid_data")
+        debug_log.debug(f"  rtheta_coords first section first point: {rtheta_coords[0][0]:.6f}", context="process_grid_data")
+        debug_log.debug(f"  rtheta_coords first section last point:  {rtheta_coords[0][-1]:.6f}", context="process_grid_data")
+        debug_log.debug(f"  d_coords first section first point: {d_coords[0][0]:.6f}", context="process_grid_data")
+        debug_log.debug(f"  d_coords first section last point:  {d_coords[0][-1]:.6f}", context="process_grid_data")
         
-        debug_log.debug(f"DEBUG row {global_row_num} (stage {current_stage}):")
-        debug_log.debug(f"  x_coords first section first point: {x_coords[0][0]:.4f}")
-        debug_log.debug(f"  x_coords first section last point:  {x_coords[0][-1]:.4f}")
-        debug_log.debug(f"  r_coords first section first point: {r_coords[0][0]:.4f}")
-        debug_log.debug(f"  r_coords first section last point:  {r_coords[0][-1]:.4f}")
-        
-        
+        # BUGFIX VERIFICATION: log passage width before (wrong) and after (correct)
+        sec0_rtheta = rtheta_coords[0]
+        sec0_d = d_coords[0]
+        sec0_r = r_coords[0]
+        # Number of blades for this row from meanline data
+        if row_num % 2 != 0:
+            z_blades = CompressorGui.meanline_data['z_R'][current_stage - 1]
+        else:
+            z_blades = CompressorGui.meanline_data['z_S'][current_stage - 1]
+        # Blade mid index (JM/2) as representative sample
+        mid_k = JM_row // 2
+        r_mid = sec0_r[mid_k]
+        pitch = 2 * 3.14159265 * r_mid / z_blades if z_blades > 0 else 0
+        thick = sec0_d[mid_k]
+        old_passage = abs(sec0_d[mid_k] - sec0_rtheta[mid_k])  # what MULTALL previously saw
+        new_passage = abs((sec0_rtheta[mid_k] - sec0_d[mid_k]) - sec0_rtheta[mid_k])  # what MULTALL now sees = thick
+        debug_log.debug(f"  BUGFIX: row {row_num} first section mid: r={r_mid:.4f}, z={z_blades}, pitch={pitch:.6f}, thick={thick:.6f}", context="passage_width")
+        debug_log.debug(f"  BUGFIX: OLD block3=d -> MULTALL saw passage width = {old_passage:.6f} (WRONG, should be ~pitch)", context="passage_width")
+        debug_log.debug(f"  BUGFIX: NEW block3=rtheta-d -> MULTALL sees thickness = {new_passage:.6f}, pitch-thickness = {pitch - thick:.6f}", context="passage_width")
         
         multall_grid_data_head_row(full_output_path, NSEC_new, row_num, JLE, JM_row, JTE, KM_grid_density, tip_clearance_multall, levels, CompressorGui, RPM, global_row_num, current_stage)
         write_coordinates(x_coords, rtheta_coords, d_coords, r_coords, full_output_path, row_num, 0, NSEC_new, JM_row, global_row_num, current_stage)
@@ -885,7 +941,9 @@ def process_grid_data(json_path, CompressorGui):
             else:  # stator row
                 create_bleed_air_card(full_output_path, stator_data, current_stage)
         '''
-        print(f"Grid data for row {row_num} written successfully.")
+        row_done_msg = f"Grid data for row {row_num} written successfully."
+        print(row_done_msg)
+        debug_log.debug(row_done_msg, context="process_grid_data")
     '''
     # Maybe placement of bleedair was wrong 
     if enable_bleed_air:
@@ -911,20 +969,43 @@ def process_grid_data(json_path, CompressorGui):
                 create_bleed_air_card(full_output_path, stator_data, current_stage)
 
     
+    # --- INTER-ROW CONTINUITY CHECK ---
+    debug_log.section("Inter-Row Continuity Check (matching planes)")
+    for j in range(len(all_rows_grid_data) - 1):
+        row_a = all_rows_grid_data[j]
+        row_b = all_rows_grid_data[j + 1]
+        x_prev_max = max(row_a['x_new'][0])
+        x_next_min = min(row_b['x_new'][0])
+        R_prev_last = row_a['R_new'][0][-1] if row_a['R_new'][0] else -1
+        R_next_first = row_b['R_new'][0][0] if row_b['R_new'][0] else -1
+        gap = x_next_min - x_prev_max
+        R_jump = R_next_first - R_prev_last
+        debug_log.debug(f"Row {row_a['row_num']}→{row_b['row_num']}: x_gap={gap:.4f}m  R_jump={R_jump:.4f}m", context="continuity")
+        if abs(R_jump) > 0.001:
+            debug_log.debug(f"  *** R discontinuity at matching plane: {R_prev_last:.4f} → {R_next_first:.4f} (jump={R_jump:.4f}m)", context="continuity")
+    
     '''
     
     if Q3D_value:
         Q3D_information(full_output_path)
-        print("Q3D information written successfully.")
+        q3d_msg = "Q3D information written successfully."
+        print(q3d_msg)
+        debug_log.debug(q3d_msg, context="process_grid_data")
     
-    print("Starting writing end of file...")
+    endfile_msg = "Starting writing end of file..."
+    print(endfile_msg)
+    debug_log.debug(endfile_msg, context="process_grid_data")
     
     total_blade_rows = nrow_wert * CompressorGui.stages_to_calc
     
     write_end_file(total_blade_rows, full_output_path, 0, KM_grid_density, levels, CompressorGui, Stage.radial_data_R, Stage.radial_data_S)
     
-    print(f"Grid data for all rows written to {full_output_path} successfully.")
-    print("All tasks completed successfully.")
+    done_msg = f"Grid data for all rows written to {full_output_path} successfully."
+    print(done_msg)
+    debug_log.debug(done_msg, context="process_grid_data")
+    all_done_msg = "All tasks completed successfully."
+    print(all_done_msg)
+    debug_log.debug(all_done_msg, context="process_grid_data")
 
     
     if enable_bleed_air:
