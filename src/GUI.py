@@ -8,6 +8,9 @@ import json
 import sys
 import subprocess
 
+_parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _parent_dir not in sys.path:
+    sys.path.insert(0, _parent_dir)
 
 #from tkinter import filedialog
 from tkinter import messagebox
@@ -23,6 +26,8 @@ from Thermodynamic_calc_GUI import Thermo
 from Fixed_radii_Meanline_GUI_v4 import meanline
 import var_Grid as VG
 import debug_log
+from misc_functions.generate_dat_files_multiple import generate_multiple_dat_files
+from misc_functions.generate_run_batch import create_run_batch
 
 
 current_dir = Path(__file__).parent.parent
@@ -2914,7 +2919,7 @@ class CompressorGui:
         #save_button = ttk.Button(main_frame, text="Save and Initialize Parameters", command=save_and_initialize_grid)
         #save_button.pack(pady=20)
         
-        ttk.Button(main_frame, text="Generate Grid", command=generate_grid).pack(pady=5)   
+        self._generate_grid_callback = generate_grid
         #save_button.pack(pady=20)   
             
              
@@ -3010,6 +3015,177 @@ class CompressorGui:
 
         dialog.mainloop() 
     
+    # region Other-Settings Tab (Compressor Map Generation)
+    
+    def other_settings_tab(self, parent_frame):
+        settings_frame = ttk.LabelFrame(parent_frame, text="Compressor Map Generation", padding=10)
+        settings_frame.pack(fill='x', padx=5, pady=5)
+
+        self.dat_enabled_var = tk.BooleanVar(value=False)
+        self.dat_start_var = tk.DoubleVar(value=100000.0)
+        self.dat_end_var = tk.DoubleVar(value=150000.0)
+        self.dat_step_var = tk.DoubleVar(value=5000.0)
+        self.dat_template_var = tk.StringVar(value="multall_output_{}.dat")
+        self.dat_batch_title_var = tk.StringVar(value="multall_compressor_map")
+
+        ttk.Checkbutton(
+            settings_frame,
+            text="Create multiple DAT files for compressor map",
+            variable=self.dat_enabled_var,
+            command=self._toggle_dat_inputs
+        ).grid(row=0, column=0, columnspan=3, sticky='w', pady=5)
+
+        ttk.Label(settings_frame, text="Start value:").grid(row=1, column=0, sticky='w', padx=5, pady=2)
+        self.dat_start_entry = ttk.Entry(settings_frame, textvariable=self.dat_start_var, width=15)
+        self.dat_start_entry.grid(row=1, column=1, sticky='w', padx=5, pady=2)
+        start_help = ttk.Label(settings_frame, text="?", cursor="question_arrow")
+        start_help.grid(row=1, column=2, padx=(5, 0))
+        Tooltip(start_help, "The first pressure value to use for the generated DAT files.")
+
+        ttk.Label(settings_frame, text="End value:").grid(row=2, column=0, sticky='w', padx=5, pady=2)
+        self.dat_end_entry = ttk.Entry(settings_frame, textvariable=self.dat_end_var, width=15)
+        self.dat_end_entry.grid(row=2, column=1, sticky='w', padx=5, pady=2)
+        end_help = ttk.Label(settings_frame, text="?", cursor="question_arrow")
+        end_help.grid(row=2, column=2, padx=(5, 0))
+        Tooltip(end_help, "The last pressure value to use for the generated DAT files.")
+
+        ttk.Label(settings_frame, text="Step value:").grid(row=3, column=0, sticky='w', padx=5, pady=2)
+        self.dat_step_entry = ttk.Entry(settings_frame, textvariable=self.dat_step_var, width=15)
+        self.dat_step_entry.grid(row=3, column=1, sticky='w', padx=5, pady=2)
+        step_help = ttk.Label(settings_frame, text="?", cursor="question_arrow")
+        step_help.grid(row=3, column=2, padx=(5, 0))
+        Tooltip(step_help, "Increment between consecutive pressure values.")
+
+        ttk.Label(settings_frame, text="Filename template:").grid(row=4, column=0, sticky='w', padx=5, pady=2)
+        self.dat_template_entry = ttk.Entry(settings_frame, textvariable=self.dat_template_var, width=40)
+        self.dat_template_entry.grid(row=4, column=1, columnspan=2, sticky='ew', padx=5, pady=2)
+        template_help = ttk.Label(settings_frame, text="?", cursor="question_arrow")
+        template_help.grid(row=4, column=3, padx=(5, 0))
+        Tooltip(template_help, "Use {} as placeholder, e.g. output_{}.dat becomes output_100000.dat")
+
+        ttk.Label(settings_frame, text="Batch title:").grid(row=5, column=0, sticky='w', padx=5, pady=2)
+        self.dat_batch_title_entry = ttk.Entry(settings_frame, textvariable=self.dat_batch_title_var, width=40)
+        self.dat_batch_title_entry.grid(row=5, column=1, columnspan=2, sticky='ew', padx=5, pady=2)
+        title_help = ttk.Label(settings_frame, text="?", cursor="question_arrow")
+        title_help.grid(row=5, column=3, padx=(5, 0))
+        Tooltip(title_help, "Window title for the batch script that runs all DAT files through MULTALL.")
+
+        info_text = "These settings are used when pressing the Generate Outputfile button below."
+        ttk.Label(settings_frame, text=info_text, font=("TkDefaultFont", 8), wraplength=500).grid(
+            row=6, column=0, columnspan=4, pady=(10, 0)
+        )
+
+        self._toggle_dat_inputs()
+    
+    def _toggle_dat_inputs(self):
+        state = tk.NORMAL if self.dat_enabled_var.get() else tk.DISABLED
+        self.dat_start_entry.config(state=state)
+        self.dat_end_entry.config(state=state)
+        self.dat_step_entry.config(state=state)
+        self.dat_template_entry.config(state=state)
+        self.dat_batch_title_entry.config(state=state)
+    
+    def _find_source_dat_file(self, output_folder):
+        dat_files = [os.path.join(output_folder, f) for f in os.listdir(output_folder)
+                     if f.endswith('.dat') and os.path.isfile(os.path.join(output_folder, f))]
+        if not dat_files:
+            return None
+        return max(dat_files, key=os.path.getmtime)
+    
+    def _generate_dat_files(self, target_folder=None):
+        if target_folder is None:
+            target_folder = self.prepop_metadata.get('output_folder', 'Run_Multall')
+            if not os.path.isabs(target_folder):
+                target_folder = os.path.join(current_dir, target_folder)
+
+        source_file = self._find_source_dat_file(target_folder)
+        if not source_file:
+            messagebox.showerror("Error", "No .dat file found in target folder. Generate a grid first.")
+            return
+
+        try:
+            start = self.dat_start_var.get()
+            end = self.dat_end_var.get()
+            step = self.dat_step_var.get()
+            template = self.dat_template_var.get()
+
+            if start > end:
+                messagebox.showerror("Error", "Start value must be less than or equal to end value.")
+                return
+            if step <= 0:
+                messagebox.showerror("Error", "Step value must be positive.")
+                return
+
+            count = generate_multiple_dat_files(source_file, target_folder, start, end, step, template)
+            messagebox.showinfo("Success", f"Created {count} DAT files in:\n{target_folder}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+    
+    def _create_run_batch(self, target_folder=None, exclude_source=None, results_dir=None):
+        if target_folder is None:
+            target_folder = self.prepop_metadata.get('output_folder', 'Run_Multall')
+            if not os.path.isabs(target_folder):
+                target_folder = os.path.join(current_dir, target_folder)
+
+        batch_title = self.dat_batch_title_var.get()
+
+        exclude = []
+        if exclude_source:
+            exclude.append(os.path.basename(exclude_source))
+
+        try:
+            count = create_run_batch(target_folder, batch_title=batch_title, exclude_files=exclude, results_dir=results_dir)
+            if count == 0:
+                messagebox.showwarning("Warning", f"No .dat files found (excluding source) in:\n{target_folder}")
+            else:
+                messagebox.showinfo("Success", f"Created batch file for {count} files in:\n{target_folder}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+    
+    # endregion
+    
+    def _generate_all_and_exit(self):
+        if hasattr(self, '_generate_grid_callback') and self._generate_grid_callback:
+            self._generate_grid_callback()
+
+        output_folder = self.prepop_metadata.get('output_folder', 'Run_Multall')
+        if not os.path.isabs(output_folder):
+            output_folder = os.path.join(current_dir, output_folder)
+
+        multall_dir = os.path.join(current_dir, 'Run_Multall')
+
+        source_file = self._find_source_dat_file(output_folder)
+
+        if self.dat_enabled_var.get():
+            if source_file:
+                import shutil
+                shutil.copy2(source_file, multall_dir)
+            self._generate_dat_files(target_folder=multall_dir)
+            results_dir = os.path.join(output_folder, self.dat_batch_title_var.get())
+            self._create_run_batch(target_folder=multall_dir, exclude_source=source_file, results_dir=results_dir)
+
+        if self.run_multall_var.get():
+            if self.dat_enabled_var.get():
+                batch_path = os.path.join(multall_dir, 'run_multall_files.bat')
+                if os.path.isfile(batch_path):
+                    subprocess.Popen(
+                        ['cmd', '/k', 'run_multall_files.bat'],
+                        cwd=multall_dir,
+                        creationflags=subprocess.CREATE_NEW_CONSOLE
+                    )
+            else:
+                if source_file:
+                    import shutil
+                    shutil.copy2(source_file, multall_dir)
+                    basename = os.path.basename(source_file)
+                    subprocess.Popen(
+                        ['cmd', '/k', f'multall.exe<{basename}'],
+                        cwd=multall_dir,
+                        creationflags=subprocess.CREATE_NEW_CONSOLE
+                    )
+
+        self.root.destroy()
+        sys.exit()
     
     def render_gui(self):
                 
@@ -3019,7 +3195,7 @@ class CompressorGui:
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.pack(fill="both", expand=True)
 
-        self.root.protocol("WM_DELETE_WINDOW", self.start_Multall)
+        #self.root.protocol("WM_DELETE_WINDOW", self.start_Multall)
                     
         # Insert tab list
         notebook = ttk.Notebook(main_frame)  
@@ -3043,10 +3219,22 @@ class CompressorGui:
         self.threeD_tab(threeD)
         self.grid_definition_tab(grid)
         #self.write_multall_data_tab(multall_data)
-        #self.other_settings_tab(other)
-                
-                
-                
+        self.other_settings_tab(other)
+
+        ttk.Button(main_frame, text="Generate Outputfile", command=self._generate_all_and_exit).pack(pady=5)
+
+        self.run_multall_var = tk.BooleanVar(value=False)
+        multall_check_frame = ttk.Frame(main_frame)
+        multall_check_frame.pack(pady=(0, 10))
+        self.run_multall_check = ttk.Checkbutton(
+            multall_check_frame,
+            text="Run MULTALL after generation",
+            variable=self.run_multall_var
+        )
+        self.run_multall_check.pack(side='left')
+        multall_help = ttk.Label(multall_check_frame, text="?", cursor="question_arrow")
+        multall_help.pack(side='left', padx=(5, 0))
+        Tooltip(multall_help, "If checked, a new command window will open and run MULTALL on the generated file(s). If multiple DAT files were created the batch file is executed, otherwise a single MULTALL run is started.")
 
         main_frame.mainloop()
 

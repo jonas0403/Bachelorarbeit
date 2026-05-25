@@ -35,16 +35,6 @@ structure.txt
 *.bak
 *.tmp
 
-# MULTALL solver binaries (in Run_Multall/)
-Run_Multall/multall.exe
-Run_Multall/multall2dat.exe
-Run_Multall/multall2py.exe
-Run_Multall/libgcc_s_dw2-1.dll
-Run_Multall/libgfortran-3.dll
-Run_Multall/libmingwex-0dll.sec
-Run_Multall/libquadmath-0.dll
-Run_Multall/run - Kopie.bat
-
 # MULTALL solver input/output/runtime files
 Run_Multall/fort.1
 Run_Multall/flow_out
@@ -62,6 +52,11 @@ Run_Multall/answer.txt
 Run_Multall/combined_input.txt
 Run_Multall/current_run.dat
 Run_Multall/*.log
+Run_Multall/*.dat
+Run_Multall/*.csv
+Run_Multall/*.tec
+Run_Multall/*.bat
+Run_Multall/Output/
 
 # MULTALL runtime files that can appear in any directory
 flow_out
@@ -77,6 +72,9 @@ loss-co.plt
 # Generated grid output files
 outputFiles/
 outputFiles/*.dat
+outputFiles/*.csv
+outputFiles/*.tec
+outputFiles/*.bat
 outputFiles/*.txt
 
 # Run-specific logs in root
