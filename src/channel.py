@@ -8,8 +8,8 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import debug_log
-#from Fixed_radii_Meanline_GUI_v4 import meanline 
-from Cubspline_function_v2 import cubspline
+#from meanline import meanline 
+from cubic_spline import cubspline
 
 Pi = math.pi
 
@@ -448,7 +448,7 @@ def channel(compressor_gui_data):
     # the meridional coordinate, producing NaN in blade surface R*theta coordinates,
     # which propagated to the MULTALL .dat file as negative volumes.
     # Fix: keep ALL x0 values in local coordinates. The cumulative offset is applied
-    # uniformly to x0[0..8] by init_channel_data() in Stage_v3_working_with_bleedair.py.
+    # uniformly to x0[0..8] by init_channel_data() in stage_calculation.py.
     # OLD: x0[1] = start_x
     x0[1] = 0.0  # local coordinate; global offset applied in init_channel_data()
     x0[2] = round(Rotor[0]*l_R, 1)

@@ -23,10 +23,10 @@ wdpath = os.getcwd()
 scriptpath = os.path.dirname(sys.argv[0])
 os.chdir(scriptpath)
 
-#from Thermodynamic_calc_GUI import Thermo
+#from thermodynamic_calculation import Thermo
 from plot_channel import plot_channel
-from Functions_losses import xi_ac_pro, xi_ac_te, xi_a_cl, xi_ac_inc, xi_a_sec, xi_ac_ma, diffusion, angle_blade_in, angle_blade_out, Re 
-from Cubspline_function_v2 import cubspline
+from loss_models import xi_ac_pro, xi_ac_te, xi_a_cl, xi_ac_inc, xi_a_sec, xi_ac_ma, diffusion, angle_blade_in, angle_blade_out, Re 
+from cubic_spline import cubspline
 
 Pi = math.pi
 
@@ -763,11 +763,11 @@ def meanline(thermo_data, meanline_data, diameter_data, plot_channel_contour):
                     kappa = cp / (cp - R)
         except ValueError as e:
             print(f"Error in thermo_data: {e}")
-            from Thermodynamic_calc_GUI import Thermo
+            from thermodynamic_calculation import Thermo
             mflow, p_t_in, T_t_in, kappa, R, cp, h_R, h_S, i_st, design_TPR = Thermo() # warum das zwei mal machen??
     else:
         print("No thermo_data provided. Please enter the required thermodynamic data through the GUI.")
-        from Thermodynamic_calc_GUI import Thermo
+        from thermodynamic_calculation import Thermo
         mflow, p_t_in, T_t_in, kappa, R, cp, h_R, h_S, i_st, design_TPR = Thermo()
     '''
     #read_initial_values("Meanline_Initial_Values.txt")

@@ -12,7 +12,7 @@ Pi = math.pi
 
 
 
-from Functions_losses import  angle_blade_in, angle_blade_out 
+from loss_models import  angle_blade_in, angle_blade_out 
 #from GUI import CompressorGui cant be used here because it closes the circle 
 
 

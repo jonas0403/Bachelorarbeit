@@ -22,12 +22,12 @@ import tkinter.messagebox as messagebox
 import tkinter as tk
 from tkinter import ttk, filedialog, Label, Toplevel
 
-from Cubspline_function_v2 import cubspline
-from Fixed_radii_Meanline_GUI_v4 import meanline 
+from cubic_spline import cubspline
+from meanline import meanline 
 from Radial_equilibrium import radial_equilibrium_R, radial_equilibrium_S
 from Bezier_curve import bezier
 from Interpolation import intpol, intp_new
-from Channel_v2 import channel
+from channel import channel
 
 wdpath = os.getcwd()
    
@@ -2743,11 +2743,11 @@ def write_values_in_block(section, liste, file, JM):
 #   5. d-surface-2 (R*theta for the OTHER blade surface, e.g. lower/pressure)
 #   6. 1.000000  0.000000
 # ===== DEAD CODE =====
-# This function is superseded by var_Grid.py:337 write_coordinates()
+# This function is superseded by grid_generator.py:337 write_coordinates()
 # which correctly writes blade thickness d in block 5 (as MULTALL expects).
 # The version below wrote rtheta_lower (= upper - thickness) instead, which
 # caused MULTALL to interpret thickness as a second surface, breaking the
-# passage width calculation. See var_Grid.py for the active implementation.
+# passage width calculation. See grid_generator.py for the active implementation.
 # =====================
 # def write_coordinates(x, rtheta, d, r, file, row, a, b, JM):
 #     rtheta_lower = []

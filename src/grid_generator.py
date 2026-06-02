@@ -5,11 +5,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import Stage_v3_working_with_bleedair as Stage
+import stage_calculation as Stage
 import json
 import debug_log
 
-#from old.Stage_v3_working_with_bleedair import NROW
+#from old.stage_calculation import NROW
 
         
 
@@ -753,7 +753,7 @@ def process_grid_data(json_path, CompressorGui):
     Receives data from the main GUI, unpacks it and
     starts the grid generation (MULTALL .dat creation).
     """
-    unpack_msg = "\n--- Starting to unpack GUI data in var_Grid ---"
+    unpack_msg = "\n--- Starting to unpack GUI data in grid_generator ---"
     print(unpack_msg)
     debug_log.debug(unpack_msg, context="process_grid_data")
     
@@ -860,7 +860,7 @@ def process_grid_data(json_path, CompressorGui):
         rtheta_coords = data['Rtheta_new']
         
         # SAFETY: If r_coords somehow arrive in mm instead of meters (max_r < 0.05),
-        # convert to meters. The root cause (Channel_v2.py returning r in meters
+        # convert to meters. The root cause (channel.py returning r in meters
         # while x in mm) was fixed, so this should not trigger.
         max_r = max(max(sec) for sec in r_coords)
         if max_r < 0.05:

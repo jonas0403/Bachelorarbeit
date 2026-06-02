@@ -27,10 +27,10 @@ else:
 import tkinter as tk
 
 import debug_log
-from Thermodynamic_calc_GUI import Thermo
-from Fixed_radii_Meanline_GUI_v4 import meanline
-from Stage_v3_working_with_bleedair import run_main_logic, init_channel_data, create_default_profiles
-import var_Grid as VG
+from thermodynamic_calculation import Thermo
+from meanline import meanline
+from stage_calculation import run_main_logic, init_channel_data, create_default_profiles
+import grid_generator as VG
 
 
 def load_json_or_die(path):

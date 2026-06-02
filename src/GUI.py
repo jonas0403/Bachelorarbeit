@@ -20,11 +20,11 @@ from tkinter import ttk, filedialog, Label, Toplevel
 from pathlib import Path
 #from matplotlib.widgets import Slider
 
-from Stage_v3_working_with_bleedair import create_default_profiles, calculation_of_section, run_main_logic
-from Cubspline_function_v2 import cubspline
-from Thermodynamic_calc_GUI import Thermo
-from Fixed_radii_Meanline_GUI_v4 import meanline
-import var_Grid as VG
+from stage_calculation import create_default_profiles, calculation_of_section, run_main_logic
+from cubic_spline import cubspline
+from thermodynamic_calculation import Thermo
+from meanline import meanline
+import grid_generator as VG
 import debug_log
 from misc_functions.generate_dat_files_multiple import generate_multiple_dat_files
 from misc_functions.generate_run_batch import create_run_batch
