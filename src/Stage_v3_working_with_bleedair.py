@@ -505,16 +505,15 @@ def init_channel_data(compressor_gui_data):
 
     for s in range(1, compressor_gui_data.stages_to_calc + 1):
         compressor_gui_data.stage = s
-        x_values_s, r_values_s, m_prime_values_s, x0_s = channel(compressor_gui_data)
+        x_values_s, r_values_s, m_prime_values_s, x0_s, r0_N_s, r0_G_s = channel(compressor_gui_data)
 
-        # channel() always returns a numpy array for x0; convert once
+        # channel() returns x0 as numpy array; convert to list
         x0_s = list(x0_s)
 
+        # ── shift every x-coordinate into the global frame ──────────────
         if cumulative_x_offset != 0.0:
-            # ── shift every x-coordinate into the global frame ──────────────
             # x0: the 9 spline control points
             x0_s = [x + cumulative_x_offset for x in x0_s]
-
             # x_values and m_prime_values: one list per span height (h_H)
             for k in range(len(x_values_s)):
                 x_values_s[k]      = [v + cumulative_x_offset for v in x_values_s[k]]
@@ -526,6 +525,8 @@ def init_channel_data(compressor_gui_data):
             'r_values':       r_values_s,
             'm_prime_values': m_prime_values_s,
             'x0':             x0_s,
+            'r0_N_mm':        r0_N_s,
+            'r0_G_mm':        r0_G_s,
         }
 
         # Stage s+1's local x0[1]=0 (rotor inlet) must land at the current
@@ -533,13 +534,121 @@ def init_channel_data(compressor_gui_data):
         cumulative_x_offset = x0_s[7]
 
         debug_log.debug(f"Stage {s}: channel stored. "
-                         f"x0[1]={x0_s[1]:.1f} mm  x0[7]={x0_s[7]:.1f} mm  "
-                         f"→ next offset = {cumulative_x_offset:.1f} mm")
+                         f"x0[0]={x0_s[0]:.1f} x0[7]={x0_s[7]:.1f} mm  "
+                         f"→ next offset = {cumulative_x_offset:.1f} mm",
+                         context="init_channel_data")
         # Verify x0 monotonicity (BUGFIX v2: all x0 values in local frame → monotonic)
         x0_all = [round(v, 1) for v in x0_s]
         x0_ok = all(x0_all[i] <= x0_all[i+1] for i in range(len(x0_all)-1))
         debug_log.debug(f"Stage {s}: x0_values = {x0_all}  monotonic={x0_ok}",
                          context="init_channel_data")
+
+    # ── Global annulus spline (Option B) ──────────────────────────────────────
+    # Build a single continuous hub/shroud annulus across all stages by
+    # concatenating per-stage control points (x0[1..7], excluding duct points
+    # x0[0] and x0[8]) and constructing global splines.  Each stage's r_values
+    # are then re-sampled from the global spline, eliminating the radial
+    # discontinuity at inter-stage interfaces that caused ~18000 negative volumes.
+    # See Docs/Negative_Volume_Debug_Log.md for details.
+    # m_prime_values are kept from the per-stage computation (the arc-length
+    # correction from the radial adjustment is O(dr²) and negligible).
+
+    # Log interface radii before correction
+    for s in range(1, compressor_gui_data.stages_to_calc):
+        hub_s   = channel_data[s]['r0_N_mm']
+        hub_n   = channel_data[s + 1]['r0_N_mm']
+        shrd_s  = channel_data[s]['r0_G_mm']
+        shrd_n  = channel_data[s + 1]['r0_G_mm']
+        x0_s    = channel_data[s]['x0']
+        x0_n    = channel_data[s + 1]['x0']
+        debug_log.debug(
+            f"INTERFACE Stage {s}→{s+1} BEFORE: "
+            f"hub={hub_s[7]:.1f}→{hub_n[1]:.1f} mm "
+            f"(Δ={hub_n[1]-hub_s[7]:+.1f}), "
+            f"shroud={shrd_s[7]:.1f}→{shrd_n[1]:.1f} mm "
+            f"(Δ={shrd_n[1]-shrd_s[7]:+.1f}), "
+            f"x={x0_s[7]:.1f}/{x0_n[1]:.1f} mm",
+            context="global_annulus")
+
+    # ── 1. Build global control-point arrays ──────────────────────────────
+    num_stages = compressor_gui_data.stages_to_calc
+    x_hub_all, r_hub_all = [], []
+    x_shroud_all, r_shroud_all = [], []
+
+    h_H = [0.0, 0.2, 0.5, 0.8, 1.0]
+
+    for s in range(1, num_stages + 1):
+        x0_g = channel_data[s]['x0']        # 9 control points, global x [mm]
+        rN   = channel_data[s]['r0_N_mm']   # hub control points [mm]
+        rG   = channel_data[s]['r0_G_mm']   # shroud control points [mm]
+
+        # Stage 1: include x0[0..7] (include inlet duct point x0[0]
+        #           so cubspline doesn't extrapolate for x < 0).
+        # Stage 2+: include x0[2..7]  (skip x0[1] which duplicates prev x0[7]).
+        # Last stage: also include x0[8] (outlet duct point) to avoid
+        #             extrapolation for x > x0[7].
+        if s == 1:
+            start = 0
+        elif s == 2:
+            start = 2
+        else:
+            start = 2  # same for all intermediate stages
+
+        if s == num_stages:
+            end = 8
+        else:
+            end = 7
+
+        for i in range(start, end + 1):
+            x_hub_all.append(x0_g[i])
+            r_hub_all.append(rN[i])
+            x_shroud_all.append(x0_g[i])
+            r_shroud_all.append(rG[i])
+
+    debug_log.debug(
+        f"Global annulus: {len(x_hub_all)} hub control points, "
+        f"x range [{x_hub_all[0]:.1f}, {x_hub_all[-1]:.1f}] mm",
+        context="global_annulus")
+
+    # ── 2. Re-sample each stage from the global spline ────────────────────
+    for s in range(1, num_stages + 1):
+        x_stage = channel_data[s]['x_values'][0]  # hub x-coords, ~130 pts [mm]
+        old_rN = channel_data[s]['r_values'][0]   # old hub radii [mm]
+        old_rG = channel_data[s]['r_values'][4]   # old shroud radii [mm]
+
+        # Re-sample hub and shroud via cubspline (Method 3)
+        r_N_new = [cubspline(3, x, x_hub_all, r_hub_all) for x in x_stage]
+        r_G_new = [cubspline(3, x, x_shroud_all, r_shroud_all) for x in x_stage]
+
+        # Re-compute r_values for all 5 span heights
+        r_values_new = []
+        for k, element in enumerate(h_H):
+            r_span = [r_N_new[i] + element * (r_G_new[i] - r_N_new[i])
+                      for i in range(len(x_stage))]
+            r_values_new.append(r_span)
+
+        channel_data[s]['r_values'] = r_values_new
+
+    # Log interface radii after correction (compare at same x-position)
+    for s in range(1, num_stages):
+        x_interface = channel_data[s]['x0'][7]  # same as next stage's x0[1]
+        x_stage_s   = channel_data[s]['x_values'][0]
+        x_stage_n   = channel_data[s + 1]['x_values'][0]
+        hub_s       = channel_data[s]['r_values'][0]
+        hub_n       = channel_data[s + 1]['r_values'][0]
+        shrd_s      = channel_data[s]['r_values'][4]
+        shrd_n      = channel_data[s + 1]['r_values'][4]
+        # Find closest index to interface in each stage's x array
+        i_s = min(range(len(x_stage_s)), key=lambda i: abs(x_stage_s[i] - x_interface))
+        i_n = min(range(len(x_stage_n)), key=lambda i: abs(x_stage_n[i] - x_interface))
+        debug_log.debug(
+            f"INTERFACE Stage {s}→{s+1} AFTER: "
+            f"hub={hub_s[i_s]:.4f}→{hub_n[i_n]:.4f} mm "
+            f"(Δ={hub_n[i_n]-hub_s[i_s]:+.4f}), "
+            f"shroud={shrd_s[i_s]:.4f}→{shrd_n[i_n]:.4f} mm "
+            f"(Δ={shrd_n[i_n]-shrd_s[i_s]:+.4f}), "
+            f"x={x_stage_s[i_s]:.1f}/{x_stage_n[i_n]:.1f} mm",
+            context="global_annulus")
 
 # def init_channel_data(compressor_gui_data):
 #     '''
@@ -2386,11 +2495,36 @@ def outlet_coordinates(row, n_max_out, l_outlet, num_planes, x_sec, Rtheta_sec, 
     elif row % 2 == 0:
         k = 6    
 
+    # DIAGNOSTIC: compare blade chord vs channel chord for stators
+    if row % 2 == 0:
+        _l_S = radial_data_S[stage]['l_S']
+        debug_log.debug(
+            f"  CHORD DIAG row={row}: l_S[10]={_l_S[10]:.3f}mm  "
+            f"x0[5]={x0[5]:.1f} x0[6]={x0[6]:.1f}  "
+            f"channel_axial={x0[6]-x0[5]:.1f}mm  "
+            f"blade_TE_midspan={x0[5]+_l_S[10]:.1f}mm  "
+            f"overshoot={x0[5]+_l_S[10]-x0[6]:+.1f}mm",
+            context="outlet_debug")
+    elif row % 2 != 0:
+        _l_R = radial_data_R[stage]['l_R']
+        debug_log.debug(
+            f"  CHORD DIAG row={row}: l_R[10]={_l_R[10]:.3f}mm  "
+            f"x0[2]={x0[2]:.1f} x0[3]={x0[3]:.1f}  "
+            f"channel_axial={x0[3]-x0[2]:.1f}mm  "
+            f"blade_TE_midspan={x0[2]+_l_R[10]:.1f}mm  "
+            f"overshoot={x0[2]+_l_R[10]-x0[3]:+.1f}mm",
+            context="outlet_debug")
+
     for i in range(num_planes):
         s = len(x_sec[i])-1
         
         DX_out.append(x0[k]/1000-x_sec[i][s])
-        DX1_out.append(x_sec[i][s]-x_sec[i][s-1])      
+        DX1_out.append(x_sec[i][s]-x_sec[i][s-1])
+        if row > 2:
+            debug_log.debug(
+                f"outlet row={row} sec={i}: x0[{k}]={x0[k]:.1f}mm "
+                f"x_sec_last={x_sec[i][s]:.6f}m dx_out={DX_out[-1]:.6f}",
+                context="outlet_debug")
         x = Rtheta_sec[i][s]
         Rtheta_out_BP[i].append(x)
         Rtheta_out_BP[i].append(x+1/math.tan(beta_S[124+125*i]/180*Pi)*DX_out[i])
@@ -2608,33 +2742,29 @@ def write_values_in_block(section, liste, file, JM):
 #   4. 1.000000
 #   5. d-surface-2 (R*theta for the OTHER blade surface, e.g. lower/pressure)
 #   6. 1.000000  0.000000
-#   7. r-coordinates
-#
-# BUGFIX: The old code wrote d (blade thickness = upper - lower) in block 5,
-# but MULTALL interprets block 5 as the second surface R*theta coordinate.
-# This made MULTALL see a passage width of ~2.5mm (the thickness) instead of
-# the actual ~28mm (pitch - thickness), causing NaN velocities in the initial guess.
-# Fix: pre-compute lower surface R*theta = rtheta - d and write that instead.
-def write_coordinates(x, rtheta, d, r, file, row, a, b, JM):
-    # BUGFIX: pre-compute the lower blade surface R*theta = upper - thickness
-    rtheta_lower = []
-    for sec_idx in range(len(rtheta)):
-        rtheta_lower.append([rtheta[sec_idx][k] - d[sec_idx][k] for k in range(len(rtheta[sec_idx]))])
-    
-    with open(file, "a") as file:
-        for i in range(a, b):       
-            file.write(" ***************************************************************\n")
-            file.write(f"  ROW NUMBER           {row}  SECTION NUMBER            {i+1}\n           0           0           0  IF_DESIGN etc \n   1.00000   0.00000    0\n")
-            write_values_in_block(i, x, file, JM)
-            file.write("  1.000000  0.000000\n")
-            write_values_in_block(i, rtheta, file, JM)
-            file.write("  1.000000\n")
-            # OLD (wrote thickness instead of second surface):
-            # write_values_in_block(i, d, file, JM)
-            # BUGFIX: write the lower blade surface R*theta (= upper - thickness)
-            write_values_in_block(i, rtheta_lower, file, JM)
-            file.write("  1.000000  0.000000\n")
-            write_values_in_block(i, r, file, JM)
+# ===== DEAD CODE =====
+# This function is superseded by var_Grid.py:337 write_coordinates()
+# which correctly writes blade thickness d in block 5 (as MULTALL expects).
+# The version below wrote rtheta_lower (= upper - thickness) instead, which
+# caused MULTALL to interpret thickness as a second surface, breaking the
+# passage width calculation. See var_Grid.py for the active implementation.
+# =====================
+# def write_coordinates(x, rtheta, d, r, file, row, a, b, JM):
+#     rtheta_lower = []
+#     for sec_idx in range(len(rtheta)):
+#         rtheta_lower.append([rtheta[sec_idx][k] - d[sec_idx][k] for k in range(len(rtheta[sec_idx]))])
+#     
+#     with open(file, "a") as file:
+#         for i in range(a, b):       
+#             file.write(" ***************************************************************\n")
+#             file.write(f"  ROW NUMBER           {row}  SECTION NUMBER            {i+1}\n           0           0           0  IF_DESIGN etc \n   1.00000   0.00000    0\n")
+#             write_values_in_block(i, x, file, JM)
+#             file.write("  1.000000  0.000000\n")
+#             write_values_in_block(i, rtheta, file, JM)
+#             file.write("  1.000000\n")
+#             write_values_in_block(i, rtheta_lower, file, JM)
+#             file.write("  1.000000  0.000000\n")
+#             write_values_in_block(i, r, file, JM)
 
 # writes information for Q3D calculation
 def Q3D_information(file):

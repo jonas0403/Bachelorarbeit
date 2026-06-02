@@ -17,7 +17,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+sys.path.insert(0, os.path.join(os.getcwd(), "src"))
 
 if sys.argv[0]:
     sys.argv[0] = os.path.abspath(sys.argv[0])
@@ -52,6 +52,7 @@ def build_compressor_gui_data(json_data, output_path):
     bleed_air_data = all_data.get("Bleed_air_data", {})
 
     stages_total = len(meanline_input.get("n", [3]))
+    stages_total = min(stages_total, 2)  # TEMP: force 2 stages for diagnostic
     cg.stage = stages_total
     cg.stages_to_calc = stages_total
 

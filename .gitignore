@@ -35,6 +35,9 @@ structure.txt
 *.bak
 *.tmp
 
+# Codegraph tool artifacts
+.codegraph/
+
 # MULTALL solver input/output/runtime files
 Run_Multall/fort.1
 Run_Multall/flow_out
@@ -85,12 +88,16 @@ static/Populated_data.json
 static/Populated_data copy.json
 static/*.bak
 
-# Agent session tracking (keep local, don't commit)
+# Agent session tracking & investigation docs (keep local, don't commit)
 Docs/AGENTS.md
+Docs/BugInvestigation.md
+Docs/Negative_Volume_Debug_Log.md
+Docs/Root_Cause_Investigation_Plan.md
 
 # Documentation PDFs and reference files
 Docs/Output/
 
-# runtime/backup files
-*.bak
-*.tmp
+# Debug command output logs
+Docs/cmdoutput.txt
+Run_Multall/cmdoutput*.txt
+Run_Multall/output_*.txt

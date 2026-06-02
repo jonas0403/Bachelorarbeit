@@ -483,6 +483,30 @@ def channel(compressor_gui_data):
     t = np.concatenate((t1, t2, t3, t4, t5))
         
     # radii of shroud and hub old:
+    # ═══════════════════════════════════════════════════════════════════════════
+    #  WARNING – round(..., 1) ON METERS = 100 mm PRECISION  ═══════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
+    # D_H1/2/3 and D_S1/2/3 are in METERS.  `round(..., 1)` rounds to nearest
+    # 0.1 m → 100 mm resolution.  This is FAR too coarse for a compressor
+    # channel:
+    #
+    #   Example: Stage 2 D_H1 = 0.332 m → r0_N[1] = round(0.166, 1) = 0.2 m
+    #            ×0.95×1000 = 190 mm  (true value: 0.166×0.95×1000 = 157.8 mm)
+    #
+    #   → The +32 mm bias PERMANENTLY shifts the hub geometry.
+    #
+    # The rounding also HIDES real inter‑stage radius discontinuities.  For the
+    # 3‑stage Populated_data.json the meanline diameters are ALREADY consistent
+    # at interfaces (because the meanline solver produces continuous D_H/D_S
+    # across stages), so the global‑annulus fix in init_channel_data() changes
+    # nothing for THIS dataset.  However, if the meanline data were to contain a
+    # genuine step (e.g. from independent stage designs), the rounding would
+    # conceal it and the global‑annulus fix would be essential.
+    #
+    # To restore true precision, replace `round(..., 1)` → `round(..., 4)`
+    # (0.0001 m = 0.1 mm).  See buginvestigation.md §"Channel rounding
+    # precision loss" for full analysis.
+    # ═══════════════════════════════════════════════════════════════════════════
     r0_N = np.full_like(x0, 0)
     r0_N[1] = round(D_H1/2, 1)
     r0_N[2] = r0_N[1] + round((D_H2-D_H1)/2*(x0[2]-x0[1])/(x0[4]-x0[1]), 1)
@@ -493,17 +517,7 @@ def channel(compressor_gui_data):
     r0_N[6] = round(D_H2/2, 1) + round((D_H3-D_H2)/2*(x0[6]-x0[4])/(x0[7]-x0[4]), 1)
     r0_N[7] = round(D_H3/2, 1)
     r0_N[8] = round((r0_N[7] - r0_N[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_N[7], 1)
-
-    # r0_G = np.full_like(x0, 0, dtype=float)
-    # r0_G[1] = round(D_S1/2, 1)
-    # r0_G[2] = r0_G[1] + round((D_S2-D_S1)/2*(x0[2]-x0[1])/(x0[4]-x0[1]), 1)
-    # r0_G[0] = round((r0_G[2]-r0_G[1])/(x0[2]-x0[1])*(x0[0]-x0[1])+r0_G[1], 1)
-    # r0_G[3] = r0_G[1] + round((D_S2-D_S1)/2*(x0[3]-x0[1])/(x0[4]-x0[1]), 1)
-    # r0_G[5] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[5]-x0[4])/(x0[7]-x0[4]), 1)
-    # r0_G[4] = round((D_S2/2 + (r0_G[3]+(r0_G[5]-r0_G[3])*(x0[4]-x0[3])/(x0[5]-x0[3])))/2 ,1)
-    # r0_G[6] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[6]-x0[4])/(x0[7]-x0[4]), 1)
-    # r0_G[7] = round(D_S3/2, 1)
-    # r0_G[8] = round((r0_G[7] - r0_G[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_G[7], 1)
+    
     r0_G = np.full_like(x0, 0)
     r0_G[1] = round(D_S1/2, 1)
     r0_G[2] = r0_G[1] + round((D_S2-D_S1)/2*(x0[2]-x0[1])/(x0[4]-x0[1]), 1)
@@ -514,8 +528,7 @@ def channel(compressor_gui_data):
     r0_G[6] = round(D_S2/2, 1) + round((D_S3-D_S2)/2*(x0[6]-x0[4])/(x0[7]-x0[4]), 1)
     r0_G[7] = round(D_S3/2, 1)
     r0_G[8] = round((r0_G[7] - r0_G[6])/(x0[7] - x0[6])*(x0[8] - x0[7]) + r0_G[7], 1)   
-    
-    
+
     if stage == 1:
         # Intake geometry
         r_S1_in = D_S1 / 2
@@ -613,6 +626,10 @@ def channel(compressor_gui_data):
     for i in range(9):
         channelHeight.append(r0_G[i] - r0_N[i]) 
 
+    # Control points in mm (for global annulus spline in init_channel_data)
+    r0_N_mm = [v * 1000.0 for v in r0_N]
+    r0_G_mm = [v * 1000.0 for v in r0_G]
+
     # BUGFIX: r_N and r_G are in meters (from meanline diameters D_H/D_S),
     # but x_N/x_G are in mm (from meanline chord lengths l_R/l_S).
     # Convert r to mm for unit consistency in arc-length and downstream /1000.
@@ -696,7 +713,7 @@ def channel(compressor_gui_data):
             r_values[k].append(r_N[i]+element*(r_G[i]-r_N[i]))
             m_prime_values[k].append(m_prime_N[i]+element*(m_prime_G[i]-m_prime_N[i]))
     
-    return x_values, r_values, m_prime_values, x0
+    return x_values, r_values, m_prime_values, x0, r0_N_mm, r0_G_mm
 
 
 
