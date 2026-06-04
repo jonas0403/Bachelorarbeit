@@ -8,10 +8,12 @@ A Python-based graphical preprocessor replacing the Fortran-coded **MEANGEN** an
 
 - [About](#about)
 - [Features](#features)
+- [Results & Visualization](#results--visualization)
 - [Quickstart](#quickstart)
 - [Usage](#usage)
 - [Project Structure](#project-structure)
 - [JSON Project Files](#json-project-files)
+- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [Background & References](#background--references)
 - [License](#license)
@@ -47,6 +49,31 @@ This tool replaces both with a modern, interactive GUI, making the preprocessing
 - **Headless pipeline** — Run the full workflow from the command line without the GUI
 - **Compressor maps** — Generate multiple `.dat` files with varying pressure ratios and batch run scripts
 - **Debug logging** — Comprehensive debug output with timestamps, sections, and context tags
+
+---
+
+## Results & Visualization
+
+<table>
+  <tr>
+    <td width="50%">
+      <strong>Compressor Map</strong> generated from MULTALL simulation data:<br><br>
+      The compressor map was produced by running multiple MULTALL simulations across varying inlet conditions and channel contours. Each curve represents a different channel geometry, allowing direct comparison of aerodynamic performance across design variants.
+    </td>
+    <td width="50%">
+      <strong>ParaView flow visualization</strong> inside rotor and stator:<br><br>
+      The flow field visualization was created using <a href="https://www.paraview.org/">ParaView</a>, an open-source data analysis and visualization tool. It shows the internal flow structure through the rotor and stator passages as computed by the MULTALL CFD solver.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="static/image/compressormap_differen_channel_contours.JPG" width="400"/>
+    </td>
+    <td width="50%">
+      <img src="static/image/airflow_visualization_rotor_stator.png" width="400"/>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -175,7 +202,7 @@ MULTALL-Stage-Generator/
 │   ├── BugInvestigation.md                  # Bug analysis documentation
 │   ├── Negative_Volume_Debug_Log.md         # Negative volume root cause analysis
 │   ├── Root_Cause_Investigation_Plan.md     # Investigation methodology
-│   ├── 10stg-compr-17.4.dat                # Reference 10-stage compressor output
+│   ├── 10stg-compr-17.4.dat                 # Reference 10-stage compressor output
 │   └── README.pdf                           # MULTALL system overview (original docs)
 ├── Run_Multall/                             # MULTALL solver binaries & runtime
 │   ├── multall.exe                          # MULTALL CFD solver
@@ -204,6 +231,30 @@ The JSON is structured into the following top-level sections:
 | `Intake_Outtake_area` | Inlet and outlet duct areas |
 
 A template file with placeholder values is available at `static/Populated_data.template.json`.
+
+---
+
+## Roadmap
+
+### In Progress
+
+| # | Feature |
+|---|---------|
+| 1 | MULTALL output file generator validation across all configurations |
+| 2 | Extensive code validation — verify calculation correctness across all configurations |
+| 3 | Autonomous headless running — prevent plots from opening during headless mode so agents and optimization scripts can run without manual intervention |
+| 4 | Fix `main.py` GUI launch — currently broken when running with the GUI |
+
+### Planned
+
+| # | Feature |
+|---|---------|
+| 1 | **Undo/Redo** — track edit history on JSON fields for safe experimentation |
+| 2 | **Integrate compressor map plotting pipeline** — extract data from `global_*.csv`, calculate derived values, merge across MULTALL runs, feed into plotting program |
+| 3 | **Add cmd output save option to GUI auto run** — save console output to `.md`/`.txt` instead of just displaying it |
+| 4 | **User-defined blade profiles** — import custom blade angle distributions from CSV |
+| 5 | **Plotting dashboard** — dedicated tab with real-time plots of velocity triangles, stage loading, reaction, efficiency vs. stage |
+| 6 | **Design of Experiments** — parametric sweeps over multiple variables (chord, solidity, RPM) for automated trade studies |
 
 ---
 

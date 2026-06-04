@@ -2497,7 +2497,7 @@ class CompressorGui:
         '''    
         
         
-        grid_data = { # Lade die Standartwerte
+        grid_data = { # Loading Default Values
             'nrow': tk.IntVar(value=2),
             'im_selection' : tk.StringVar(value=37),   # Default value for IM
             'km_selection' : tk.StringVar(value=37),   # Default value for KM

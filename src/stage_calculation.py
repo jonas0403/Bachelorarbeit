@@ -2495,6 +2495,14 @@ def outlet_coordinates(row, n_max_out, l_outlet, num_planes, x_sec, Rtheta_sec, 
     elif row % 2 == 0:
         k = 6    
 
+    # Full x0 array for channel geometry overview
+    debug_log.debug(
+        f"DX_out row={row} stage={stage} k={k}: "
+        f"x0={[round(v,1) for v in x0]}  "
+        f"x0[{k}]={x0[k]:.1f}mm  "
+        f"n_max_out={n_max_out}  l_outlet={l_outlet}",
+        context="outlet_debug")
+
     # DIAGNOSTIC: compare blade chord vs channel chord for stators
     if row % 2 == 0:
         _l_S = radial_data_S[stage]['l_S']
@@ -2520,11 +2528,19 @@ def outlet_coordinates(row, n_max_out, l_outlet, num_planes, x_sec, Rtheta_sec, 
         
         DX_out.append(x0[k]/1000-x_sec[i][s])
         DX1_out.append(x_sec[i][s]-x_sec[i][s-1])
-        if row > 2:
-            debug_log.debug(
-                f"outlet row={row} sec={i}: x0[{k}]={x0[k]:.1f}mm "
-                f"x_sec_last={x_sec[i][s]:.6f}m dx_out={DX_out[-1]:.6f}",
-                context="outlet_debug")
+
+        d_val = DX_out[-1]
+        x_sec_last_mm = x_sec[i][s] * 1000
+        status = ""
+        if d_val < 0:
+            status = " *** NEGATIVE: blade TE past channel exit ***"
+        elif d_val < 0.005:
+            status = f" *** VERY SMALL: only {d_val*1000:.1f}mm for {n_max_out} outlet points ***"
+        debug_log.debug(
+            f"DX_out row={row} sec={i}: "
+            f"x0[{k}]={x0[k]:.1f}mm  x_sec_TE={x_sec_last_mm:.3f}mm  "
+            f"DX_out={d_val*1000:.3f}mm  n_max_out={n_max_out}{status}",
+            context="outlet_debug")
         x = Rtheta_sec[i][s]
         Rtheta_out_BP[i].append(x)
         Rtheta_out_BP[i].append(x+1/math.tan(beta_S[124+125*i]/180*Pi)*DX_out[i])
@@ -2766,14 +2782,14 @@ def write_values_in_block(section, liste, file, JM):
 #             file.write("  1.000000  0.000000\n")
 #             write_values_in_block(i, r, file, JM)
 
-# writes information for Q3D calculation
-def Q3D_information(file):
-    with open(file, "a") as file:
-        file.write("  DATA FOR STREAM SURFACE THICKNESS\n")
-        file.write("   1.00000000      Q3DFORCE\n")
-        file.write("           5  A UNIFORM  SS THICKNESS IS INITIALLY SET\n")
-        file.write("   0.00000000      0.250000000      0.500000000      0.750000000      1.00000000\n")
-        file.write("   1.00000000      1.00000000      1.00000000      1.00000000      1.00000000\n")     
+# (dead code — Q3D_information moved to grid_generator.py)
+# def Q3D_information(file):
+#     with open(file, "a") as file:
+#         file.write("  DATA FOR STREAM SURFACE THICKNESS\n")
+#         file.write("   1.00000000      Q3DFORCE\n")
+#         file.write("           5  A UNIFORM  SS THICKNESS IS INITIALLY SET\n")
+#         file.write("   0.00000000      0.250000000      0.500000000      0.750000000      1.00000000\n")
+#         file.write("   1.00000000      1.00000000      1.00000000      1.00000000      1.00000000\n")     
 
 # writes head of the file
 def write_head_file(file, NSEC, NROW, section, enable_bleed_air):

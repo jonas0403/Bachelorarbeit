@@ -236,7 +236,7 @@ def write_head_file(KM_grid_density, IM_grid_density, file_path, section, NROW, 
         file.write("         0\n")
         file.write("  NSTEPS_MAX, CONLIM\n")
         if CompressorGui.stages_to_calc > 1:
-            file.write("      120000  0.006000\n") # Documentation calls for more steps in multistage applications
+            file.write("      12000  0.006000\n") # Documentation calls for more steps in multistage applications
         elif section == 0:
             file.write("      9000  0.006000\n")
         else: 
@@ -277,7 +277,10 @@ def write_head_file(KM_grid_density, IM_grid_density, file_path, section, NROW, 
              file.write("  1.000000\n")
 
         file.write("        IR        JR        KR        IRBB      JRBB      KRBB \n")
-        file.write("         3         3         3         9         9         9\n")
+        if Q3D_value:
+            file.write("         3         3         1         9         9         1\n")
+        else:
+            file.write("         3         3         3         9         9         9\n")
         file.write("   FBLK1,     FBLK2,     FBLK3  \n")
         file.write("  0.400000  0.200000  0.100000\n")
         file.write("       IFMIX \n")
@@ -348,13 +351,14 @@ def write_coordinates(x, rtheta, d, r, file, row, a, b, JM, global_row_num, curr
             write_values_in_block(i, r, file, JM)
             
 # writes information for Q3D calculation
-def Q3D_information(file):
-    with open(file, "a") as file:
-        file.write("  DATA FOR STREAM SURFACE THICKNESS\n")
-        file.write("   1.00000000      Q3DFORCE\n")
-        file.write("           5  A UNIFORM  SS THICKNESS IS INITIALLY SET\n")
-        file.write("   0.00000000      0.250000000      0.500000000      0.750000000      1.00000000\n")
-        file.write("   1.00000000      1.00000000      1.00000000      1.00000000      1.00000000\n")     
+# MULTALL expects Q3D data after each blade row's last section.
+# Format matched to the Session 10 format that produced correct MULTALL output.
+def Q3D_information(file_handle):
+    file_handle.write("  DATA FOR STREAM SURFACE THICKNESS\n")
+    file_handle.write("   1.00000000      Q3DFORCE\n")
+    file_handle.write("           5  A UNIFORM  SS THICKNESS IS INITIALLY SET\n")
+    file_handle.write("   0.00000000      0.250000000      0.500000000      0.750000000      1.00000000\n")
+    file_handle.write("   1.00000000      1.00000000      1.00000000      1.00000000      1.00000000\n")     
 
 """
 # writes end of the file 
@@ -375,6 +379,13 @@ def write_end_file(row, file, section, KM, levels, CompressorGui, radial_data_R,
     elif row == 2:
         x = round(Stage.p_S_out[0], 1)
         y = round(Stage.p_R_out[len(Stage.h_rel)-1], 1)
+        t = round(Stage.T_t1[0], 4)
+        p = round(Stage.p_t1[0], 1)
+        um = round(Stage.cm1[0], 4)
+    
+    else:
+        x = round(Stage.p_S_out[0], 1)
+        y = round(Stage.p_S_out[len(Stage.h_rel)-1], 1)
         t = round(Stage.T_t1[0], 4)
         p = round(Stage.p_t1[0], 1)
         um = round(Stage.cm1[0], 4)
@@ -636,6 +647,15 @@ def generate_var_grid_data(nrow, IM_grid_density, KM_grid_density, JM_grid_densi
 
     # Variable to calc which rows will be calculated
     nrow_wert = nrow * CompressorGui.stages_to_calc
+
+    grid_param_msg = (
+        f"Grid params: IM={IM_grid_density} KM={KM_grid_density} "
+        f"JM_ref={JM_grid_density} ref_chord={reference_chord_length}mm "
+        f"inlet={inlet_percentage*100:.0f}% outlet={outlet_percentage*100:.0f}% "
+        f"total_rows={nrow_wert}"
+    )
+    print(grid_param_msg)
+    debug_log.debug(grid_param_msg, context="generate_var_grid_data")
     
     for row_num in range(1, nrow_wert + 1):
         status_msg = f"Processing blade row {row_num} (Density: {JM_grid_density})"
@@ -741,10 +761,9 @@ def process_grid_data(json_path, CompressorGui):
                 create_bleed_air_card(...)     # bleed cards per row # Here will be issues at the moment bleed is only working for first stage
 
     # 3. Write once at the end
-        if Q3D_value:
-            Q3D_information(...)
-
         write_end_file(NROW, ...)   # inlet BCs + mixing length limits
+    # Note: Q3D data is written inside the per-row loop (after write_coordinates),
+    # NOT at the end of file. See line ~926.
     '''
     
     
@@ -843,7 +862,7 @@ def process_grid_data(json_path, CompressorGui):
         
     full_output_path = os.path.join(output_path, output_name)
     
-    NSEC = len(levels)
+    NSEC = 1 if Q3D_value else len(levels)
 
     head_msg = "Writing MULTALL grid data head row..."
     print(head_msg)
@@ -869,7 +888,19 @@ def process_grid_data(json_path, CompressorGui):
         JLE = data['JLE']
         JTE = data['JTE']
         JM_row = data['JM']
-        NSEC_new = len(data['x_new'])
+        NSEC_new = 1 if Q3D_value else len(data['x_new'])
+
+        # Q3D: use mid-span section (closest to 0.5 span) instead of hub (section 0).
+        # The hub has the thickest blade and narrowest passage, which can cause the
+        # initial flow field calculation to fail in MULTALL's Q3D solver for
+        # small-chord stages (e.g., Stage 3 rotor/passage too narrow at hub).
+        # Mid-span provides a more representative section for 2D flow initialization,
+        # matching what the meanline calculation uses (50% span as reference).
+        if Q3D_value:
+            q3d_sec = min(range(len(levels)), key=lambda i: abs(levels[i] - 0.5))
+            debug_log.debug(f"Q3D mid-span: section idx={q3d_sec} (span={levels[q3d_sec]})", context="process_grid_data")
+        else:
+            q3d_sec = 0
 
         # Global row number (1-based across all stages)
         global_row_num = i + 1
@@ -911,7 +942,15 @@ def process_grid_data(json_path, CompressorGui):
         debug_log.debug(f"  BUGFIX: NEW block3=rtheta-d -> MULTALL sees thickness = {new_passage:.6f}, pitch-thickness = {pitch - thick:.6f}", context="passage_width")
         
         multall_grid_data_head_row(full_output_path, NSEC_new, row_num, JLE, JM_row, JTE, KM_grid_density, tip_clearance_multall, levels, CompressorGui, RPM, global_row_num, current_stage)
-        write_coordinates(x_coords, rtheta_coords, d_coords, r_coords, full_output_path, row_num, 0, NSEC_new, JM_row, global_row_num, current_stage)
+        sec_start = q3d_sec if Q3D_value else 0
+        sec_end = (q3d_sec + 1) if Q3D_value else NSEC_new
+        write_coordinates(x_coords, rtheta_coords, d_coords, r_coords, full_output_path, row_num, sec_start, sec_end, JM_row, global_row_num, current_stage)
+        if Q3D_value:
+            with open(full_output_path, "a") as f:
+                Q3D_information(f)
+                # Do NOT write IF_CUSP/IFANGLES here — that card belongs in the
+                # row header (multall_grid_data_head_row). After Q3D data MULTALL
+                # returns to the main data loop and expects the next row's Card 51.
         '''
         # possible worng location of bleed air 
         if enable_bleed_air:
@@ -976,12 +1015,6 @@ def process_grid_data(json_path, CompressorGui):
             debug_log.debug(f"  *** R discontinuity at matching plane: {R_prev_last:.4f} → {R_next_first:.4f} (jump={R_jump:.4f}m)", context="continuity")
     
     '''
-    
-    if Q3D_value:
-        Q3D_information(full_output_path)
-        q3d_msg = "Q3D information written successfully."
-        print(q3d_msg)
-        debug_log.debug(q3d_msg, context="process_grid_data")
     
     endfile_msg = "Starting writing end of file..."
     print(endfile_msg)
