@@ -137,10 +137,16 @@ def multall_grid_data_head_row(file_path, NSEC, row, JLE, JM, JTE, KM, tip_clear
         else:
             ktipstart = 0
             ktipend = 0
-    
+
     if tip_clearance[current_stage] == 0:
         ktipstart = 0
         ktipend = 0
+
+    # Q3D mode uses KM=2 which gives ktipstart=KM-4=-2 (invalid for MULTALL)
+    if KM < 4:
+        ktipstart = 0
+        ktipend = 0
+        actual_tip_clearance = 0.0
 
     if section == 0:
         if row_num % 2 != 0:  # Odd rows = rotor
@@ -856,7 +862,7 @@ def process_grid_data(json_path, CompressorGui):
         JM_dynamic_stator = 0
 
     if Q3D_value:
-        output_name = f"multall_grid_Q3D_IM_{IM_grid_density}__R_{JM_dynamic_rotor}_S_{JM_dynamic_stator}_rows_{nrow_wert}.dat"
+        output_name = f"multall_grid_Q3D_IM_{IM_grid_density}_R_{JM_dynamic_rotor}_S_{JM_dynamic_stator}_rows_{nrow_wert}.dat"
     else:
         output_name = f"multall_grid_IM_{IM_grid_density}_KM_{KM_grid_density}_R_{JM_dynamic_rotor}_S_{JM_dynamic_stator}_rows_{nrow_wert}.dat"
         

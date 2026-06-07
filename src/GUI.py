@@ -55,8 +55,6 @@ def read_initial_values(filename):
             elif line.startswith('TPR = '):
                 TPR = float(line[6:])
                     
-    
-
 class CompressorGui:
     '''
     Load all data once and save into different class data dicts
@@ -2681,6 +2679,9 @@ class CompressorGui:
             if grid_data['Q3D_mode'].get():
                 grid_data['km_selection'].set(2) 
                 KM_combobox.config(state=tk.DISABLED) 
+                tip_clearance_entry = self.widgets['tip_clearance_rotor']
+                grid_data['tip_clearance_rotor'].set(0.0)
+                tip_clearance_entry.config(state=tk.DISABLED)
             else:
                 KM_combobox.config(state=tk.NORMAL) 
                 grid_data['km_selection'].set(37)  
